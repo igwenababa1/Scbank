@@ -30,6 +30,7 @@ const SendMoney: React.FC<SendMoneyProps> = ({ setActiveView }) => {
     const [fromAccount, setFromAccount] = useState<Account>(ACCOUNTS[0]);
     const [note, setNote] = useState('');
     const [itccCode, setItccCode] = useState('');
+    const [complianceChecked, setComplianceChecked] = useState(false);
     
     // Manual Entry Data
     const [manualName, setManualName] = useState('');
@@ -42,7 +43,6 @@ const SendMoney: React.FC<SendMoneyProps> = ({ setActiveView }) => {
     const [isConfirming, setIsConfirming] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
     const [processingStepIndex, setProcessingStepIndex] = useState(0);
-    const [complianceAcknowledged, setComplianceAcknowledged] = useState(false);
 
     const amountNum = parseFloat(amount) || 0;
     
@@ -67,6 +67,15 @@ const SendMoney: React.FC<SendMoneyProps> = ({ setActiveView }) => {
         }
     }, [routingNumber]);
 
+    // Reset compliance check if ITCC changes
+    useEffect(() => {
+        if (isItccValid) {
+            setComplianceChecked(true); // Auto-check if code is valid
+        } else {
+            setComplianceChecked(false);
+        }
+    }, [itccCode, isItccValid]);
+
     // Determine Target Details for Display/Processing
     const targetDetails = useMemo(() => {
         if (recipientMode === 'contact' && selectedContact) {
@@ -90,20 +99,23 @@ const SendMoney: React.FC<SendMoneyProps> = ({ setActiveView }) => {
 
     const processingSteps = useMemo(() => {
         const steps = [
-            { label: "Authenticating Secure Channel...", icon: "fa-fingerprint", duration: 1000 },
-            { label: `Connecting to ${targetDetails.bank} Gateway...`, icon: "fa-university", duration: 1500 },
-            { label: "Verifying Account Existence...", icon: "fa-search-dollar", duration: 1200 },
+            { label: "Initiating Secure Handshake (SSL/TLS 1.3)...", icon: "fa-key", duration: 1200 },
+            { label: "Verifying Biometric Session Token...", icon: "fa-fingerprint", duration: 1000 },
+            { label: `Establishing Secure Link to ${targetDetails.bank}...`, icon: "fa-university", duration: 1500 },
+            { label: "Performing AML/KYC Regulatory Checks...", icon: "fa-user-shield", duration: 1500 },
         ];
 
         if (isItccValid) {
-            steps.push({ label: "Verifying ITCC Compliance Protocol...", icon: "fa-file-contract", duration: 1500 });
+            steps.push({ label: "Verifying ITCC Protocol Signature...", icon: "fa-file-signature", duration: 1200 });
+            steps.push({ label: "Compliance Verified. Fee Waived.", icon: "fa-check-circle", duration: 800 });
         } else {
-            steps.push({ label: "Acquiring Temporary ITCC Token...", icon: "fa-key", duration: 2000 });
-            steps.push({ label: "Processing Compliance Fee...", icon: "fa-file-invoice-dollar", duration: 1500 });
+            steps.push({ label: "ITCC Protocol Not Detected.", icon: "fa-exclamation-triangle", duration: 1000 });
+            steps.push({ label: "Acquiring Temporary Compliance Certificate...", icon: "fa-file-contract", duration: 2000 });
+            steps.push({ label: "Processing Non-Compliance Surcharge (15%)...", icon: "fa-percentage", duration: 1200 });
         }
 
-        steps.push({ label: "Executing Interbank Settlement...", icon: "fa-network-wired", duration: 1800 });
-        steps.push({ label: "Transaction Finalized", icon: "fa-check-double", duration: 800 });
+        steps.push({ label: "Finalizing Ledger Settlement...", icon: "fa-network-wired", duration: 1200 });
+        steps.push({ label: "Transaction Successfully Recorded", icon: "fa-check-double", duration: 500 });
 
         return steps;
     }, [isItccValid, targetDetails]);
@@ -157,6 +169,8 @@ const SendMoney: React.FC<SendMoneyProps> = ({ setActiveView }) => {
         (recipientMode === 'contact' && selectedContact) ||
         (recipientMode === 'manual' && manualName && routingNumber.length >= 9 && accountNumber.length >= 8)
     );
+    
+    const canProceed = isFormValid && (isItccValid || complianceChecked);
 
     if (isProcessing) {
         const currentStep = processingSteps[Math.min(processingStepIndex, processingSteps.length - 1)];
@@ -176,8 +190,8 @@ const SendMoney: React.FC<SendMoneyProps> = ({ setActiveView }) => {
                                 <i className={`fas ${currentStep.icon} text-3xl text-white`}></i>
                             </div>
                         </div>
-                        <h3 className="text-2xl font-bold text-white tracking-tight mb-2">Processing Transaction</h3>
-                        <p className="text-blue-400 font-mono text-xs uppercase tracking-widest">ID: {Date.now().toString(36).toUpperCase()}</p>
+                        <h3 className="text-2xl font-bold text-white tracking-tight mb-2">Secure Processing</h3>
+                        <p className="text-blue-400 font-mono text-xs uppercase tracking-widest">Session ID: {Date.now().toString(36).toUpperCase()}</p>
                     </div>
 
                     <div className="space-y-6 relative">
@@ -224,20 +238,24 @@ const SendMoney: React.FC<SendMoneyProps> = ({ setActiveView }) => {
             <div className="animate-fade-in-scale-up max-w-2xl mx-auto py-6">
                 <div className="bg-white rounded-2xl shadow-2xl overflow-hidden border border-gray-200 relative">
                     {/* Receipt Header */}
-                    <div className="bg-[#1a365d] p-8 text-white relative overflow-hidden">
+                    <div className="bg-[#0f172a] p-8 text-white relative overflow-hidden">
                         <div className="absolute top-0 right-0 p-4 opacity-10">
-                            <i className="fas fa-university text-9xl"></i>
+                            <i className="fas fa-shield-alt text-9xl"></i>
                         </div>
-                        <p className="text-blue-200 text-xs font-bold uppercase tracking-widest mb-2">Confirm Transaction</p>
+                        <div className="flex items-center gap-2 mb-4">
+                            <span className="px-2 py-0.5 rounded bg-yellow-500/20 text-yellow-400 border border-yellow-500/50 text-[10px] font-bold uppercase tracking-wider">Secure Transfer</span>
+                            {!isItccValid && <span className="px-2 py-0.5 rounded bg-red-500/20 text-red-400 border border-red-500/50 text-[10px] font-bold uppercase tracking-wider">Fee Applied</span>}
+                        </div>
+                        
+                        <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mb-1">Total Debit Authorization</p>
                         <h2 className="text-5xl font-extrabold tracking-tight">{formatCurrency(totalDebit)}</h2>
-                        <p className="text-sm text-blue-300 mt-1">Total Debit Amount</p>
                         
                         {!isItccValid && (
-                            <div className="mt-6 bg-red-600/20 border border-red-400/30 rounded-lg p-3 flex items-start gap-3 backdrop-blur-sm animate-pulse">
-                                <i className="fas fa-exclamation-triangle text-red-300 mt-1"></i>
+                            <div className="mt-6 bg-red-500/10 border border-red-500/30 rounded-lg p-4 flex items-start gap-3 backdrop-blur-sm">
+                                <i className="fas fa-info-circle text-red-400 mt-1 text-lg"></i>
                                 <div>
-                                    <p className="text-xs font-bold text-red-200 uppercase tracking-wide">ITCC Code Missing</p>
-                                    <p className="text-xs text-red-100">Mandatory compliance acquisition required.</p>
+                                    <p className="text-sm font-bold text-red-200">Includes ITCC Acquisition Fee</p>
+                                    <p className="text-xs text-red-300/80 mt-0.5">You have authorized a 15% surcharge for regulatory compliance processing.</p>
                                 </div>
                             </div>
                         )}
@@ -245,6 +263,7 @@ const SendMoney: React.FC<SendMoneyProps> = ({ setActiveView }) => {
 
                     {/* Receipt Body */}
                     <div className="p-8 space-y-6">
+                        {/* Beneficiary Section */}
                         <div className="flex items-center justify-between pb-6 border-b border-gray-100">
                             <div className="flex items-center gap-4">
                                 <div className="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center border border-gray-200 overflow-hidden">
@@ -253,17 +272,20 @@ const SendMoney: React.FC<SendMoneyProps> = ({ setActiveView }) => {
                                 <div>
                                     <p className="text-xs text-gray-500 uppercase tracking-wider font-bold">Beneficiary</p>
                                     <p className="text-xl font-bold text-gray-800">{targetDetails.name}</p>
-                                    <p className="text-xs text-gray-500">{targetDetails.bank} • {targetDetails.account}</p>
+                                    <p className="text-xs text-gray-500 flex items-center gap-1">
+                                        <i className="fas fa-building text-gray-400"></i> {targetDetails.bank} • {targetDetails.account}
+                                    </p>
                                 </div>
                             </div>
                              <div className="text-right">
-                                <p className="text-xs text-gray-500 uppercase tracking-wider font-bold">Date</p>
+                                <p className="text-xs text-gray-500 uppercase tracking-wider font-bold">Value Date</p>
                                 <p className="text-sm font-bold text-gray-800">{new Date().toLocaleDateString()}</p>
                             </div>
                         </div>
 
+                        {/* Details Table */}
                         <div className="space-y-3 text-sm">
-                            <div className="flex justify-between p-3 bg-gray-50 rounded-lg">
+                            <div className="flex justify-between p-3 bg-gray-50 rounded-lg border border-gray-100">
                                 <span className="text-gray-500 font-medium">Source Account</span>
                                 <span className="font-mono font-bold text-gray-800">{fromAccount.type} ({fromAccount.number})</span>
                             </div>
@@ -276,47 +298,32 @@ const SendMoney: React.FC<SendMoneyProps> = ({ setActiveView }) => {
                             </div>
                             
                             {surchargeAmount > 0 ? (
-                                <div className="flex justify-between bg-red-50 p-2 rounded border border-red-100">
-                                    <span className="text-red-700 font-bold flex items-center gap-2">
-                                        <i className="fas fa-shield-alt"></i> ITCC Acquisition Fee
-                                    </span>
+                                <div className="flex justify-between bg-red-50 p-3 rounded border border-red-100">
+                                    <div className="flex items-center gap-2 text-red-700">
+                                        <i className="fas fa-file-invoice-dollar"></i>
+                                        <span className="font-bold">ITCC Acquisition Fee (15%)</span>
+                                    </div>
                                     <span className="text-red-700 font-bold">
                                         +{formatCurrency(surchargeAmount)}
                                     </span>
                                 </div>
                             ) : (
-                                <div className="flex justify-between">
-                                    <span className="text-green-600 font-medium">ITCC Code Verified</span>
-                                    <span className="text-green-600 font-bold">Waived</span>
+                                <div className="flex justify-between bg-green-50 p-3 rounded border border-green-100">
+                                    <div className="flex items-center gap-2 text-green-700">
+                                        <i className="fas fa-shield-check"></i>
+                                        <span className="font-bold">ITCC Compliance Verified</span>
+                                    </div>
+                                    <span className="text-green-700 font-bold">Waived</span>
                                 </div>
                             )}
                             
                             {note && (
-                                <div className="flex justify-between">
-                                    <span className="text-gray-500">Note</span>
+                                <div className="flex justify-between pt-2">
+                                    <span className="text-gray-500">Reference</span>
                                     <span className="italic text-gray-800">"{note}"</span>
                                 </div>
                             )}
                         </div>
-
-                        {!isItccValid && (
-                            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-xs text-gray-600 leading-relaxed">
-                                <p className="font-bold text-gray-800 mb-1"><i className="fas fa-file-contract mr-1"></i> Digital Payment Note:</p>
-                                <p>
-                                    Pursuant to International Banking Regulation 402(c), transactions lacking a pre-registered ITCC identifier must acquire a temporary compliance token. 
-                                    By proceeding, you authorize the <strong>Automatic ITCC Code Acquisition Fee</strong> of {formatCurrency(surchargeAmount)} to be debited from your account to facilitate immediate regulatory clearance.
-                                </p>
-                                <label className="flex items-start gap-3 mt-3 cursor-pointer">
-                                    <input 
-                                        type="checkbox" 
-                                        checked={complianceAcknowledged} 
-                                        onChange={e => setComplianceAcknowledged(e.target.checked)} 
-                                        className="mt-0.5 w-4 h-4 text-[#1a365d] rounded border-gray-300 focus:ring-[#1a365d]"
-                                    />
-                                    <span className="font-bold text-gray-800">I accept the ITCC Acquisition Fee and authorize this transaction.</span>
-                                </label>
-                            </div>
-                        )}
 
                         <div className="pt-6 border-t border-gray-100">
                             <div className="flex gap-4">
@@ -325,11 +332,10 @@ const SendMoney: React.FC<SendMoneyProps> = ({ setActiveView }) => {
                                 </button>
                                 <button 
                                     onClick={handleConfirm} 
-                                    disabled={!isItccValid && !complianceAcknowledged}
-                                    className="flex-[2] py-3 rounded-xl bg-gradient-to-r from-[#1a365d] to-[#2d5c8a] text-white font-bold hover:shadow-lg transition-all transform hover:-translate-y-0.5 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                                    className="flex-[2] py-3 rounded-xl bg-[#1a365d] text-white font-bold hover:bg-[#2d5c8a] hover:shadow-lg transition-all transform hover:-translate-y-0.5 flex items-center justify-center gap-2"
                                 >
                                     <i className="fas fa-fingerprint"></i> 
-                                    {isItccValid ? "Authorize Transfer" : "Pay Fee & Authorize"}
+                                    Confirm & Transfer
                                 </button>
                             </div>
                         </div>
@@ -470,29 +476,58 @@ const SendMoney: React.FC<SendMoneyProps> = ({ setActiveView }) => {
 
                     {/* Right Column: Compliance & Details */}
                     <div className="space-y-6">
-                        <div className={`rounded-2xl p-6 border backdrop-blur-sm transition-all duration-300 ${isItccValid ? 'bg-green-900/10 border-green-500/30' : 'bg-white/5 border-white/10'}`}>
-                             <div className="flex justify-between items-start mb-2">
-                                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider">
-                                    ITCC Compliance Code <span className="text-red-400">*</span>
-                                </label>
-                                {isItccValid && <i className="fas fa-shield-check text-green-400 text-lg"></i>}
-                             </div>
-                             <input 
-                                type="text" 
-                                value={itccCode} 
-                                onChange={e => setItccCode(e.target.value)} 
-                                placeholder="e.g., ITCC-8X92-001"
-                                className="w-full bg-transparent border-b border-gray-600 py-2 text-white placeholder-gray-600 focus:border-yellow-400 focus:outline-none font-mono tracking-wider"
-                            />
-                            <div className="flex justify-between items-start mt-2">
-                                <p className={`text-[10px] ${isItccValid ? 'text-green-400' : 'text-red-400'}`}>
-                                    {isItccValid ? 'Code Verified.' : 'Compulsory for all transfers.'}
-                                </p>
-                                {!isItccValid && (
-                                    <button onClick={handleContactSupport} className="text-[10px] text-yellow-400 hover:text-white underline font-semibold">
-                                        Need a code? Contact Support
-                                    </button>
-                                )}
+                        {/* ITCC Compliance Section */}
+                        <div className="bg-[#1e293b]/50 backdrop-blur-xl rounded-2xl p-6 border border-white/10 shadow-xl relative overflow-hidden group">
+                            {/* Decorative background element */}
+                            <div className="absolute -right-6 -top-6 w-24 h-24 bg-blue-500/10 rounded-full blur-2xl"></div>
+                            
+                            <h3 className="text-sm font-bold text-white flex items-center gap-2 mb-4">
+                                <i className="fas fa-passport text-blue-400"></i> 
+                                Cross-Border Compliance
+                            </h3>
+
+                            <div className="space-y-4">
+                                 <div>
+                                    <label className="text-[10px] uppercase font-bold text-gray-400 tracking-wider mb-1 block">ITCC Protocol ID</label>
+                                    <div className="relative">
+                                        <input 
+                                            type="text" 
+                                            value={itccCode} 
+                                            onChange={e => setItccCode(e.target.value)} 
+                                            placeholder="ITCC-XXXX-XXXX"
+                                            className={`w-full bg-black/40 border ${isItccValid ? 'border-green-500/50 text-green-400' : 'border-white/10 text-white'} rounded-lg py-3 pl-4 pr-10 font-mono text-sm tracking-widest uppercase focus:outline-none focus:border-yellow-400 transition-colors`}
+                                        />
+                                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                            {isItccValid && <i className="fas fa-check-circle text-green-400"></i>}
+                                        </div>
+                                    </div>
+                                 </div>
+
+                                 {isItccValid ? (
+                                     <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3 flex items-center gap-3 animate-fade-in-status-item">
+                                         <div className="w-5 h-5 rounded-full bg-green-500/20 flex items-center justify-center text-green-400 text-xs"><i className="fas fa-check"></i></div>
+                                         <span className="text-xs text-green-300 font-medium">Compliance Verified. Fee Waived.</span>
+                                     </div>
+                                 ) : (
+                                     <div className="bg-yellow-500/5 border border-yellow-500/20 rounded-lg p-3">
+                                         <div className="flex gap-3 mb-3">
+                                             <i className="fas fa-info-circle text-yellow-500 mt-0.5 text-xs"></i>
+                                             <p className="text-xs text-gray-300 leading-relaxed">
+                                                 <span className="text-yellow-500 font-bold">Notice:</span> Without a valid ITCC code, a <span className="text-white font-bold">15% Regulatory Fee</span> is mandatory for international clearance under Regulation 402(c).
+                                             </p>
+                                         </div>
+                                         <label className="flex items-start gap-3 cursor-pointer group p-2 hover:bg-white/5 rounded transition-colors">
+                                             <div className={`w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center transition-colors mt-0.5 ${complianceChecked ? 'bg-yellow-500 border-yellow-500' : 'border-gray-500 bg-transparent group-hover:border-yellow-400'}`}>
+                                                 {complianceChecked && <i className="fas fa-check text-black text-[10px]"></i>}
+                                             </div>
+                                             <input type="checkbox" className="hidden" checked={complianceChecked} onChange={e => setComplianceChecked(e.target.checked)} />
+                                             <span className="text-[10px] text-gray-400 group-hover:text-gray-300 transition-colors select-none font-medium">I acknowledge the fee and authorize processing.</span>
+                                         </label>
+                                         <button onClick={handleContactSupport} className="mt-3 text-[10px] text-blue-400 hover:text-blue-300 flex items-center gap-1 ml-7 transition-colors">
+                                            <i className="fas fa-external-link-alt"></i> Need a code? Contact Support
+                                        </button>
+                                     </div>
+                                 )}
                             </div>
                         </div>
 
@@ -502,21 +537,22 @@ const SendMoney: React.FC<SendMoneyProps> = ({ setActiveView }) => {
                                 type="text" 
                                 value={note} 
                                 onChange={e => setNote(e.target.value)} 
-                                placeholder="What is this payment for?"
+                                placeholder="Payment description"
                                 className="w-full bg-transparent border-b border-gray-600 py-2 text-white placeholder-gray-600 focus:border-yellow-400 focus:outline-none" 
                             />
                         </div>
                         
                          <button 
                             onClick={() => setIsConfirming(true)} 
-                            disabled={!isFormValid} 
-                            className="w-full py-4 rounded-xl bg-yellow-400 text-[#1a365d] font-bold text-lg hover:bg-yellow-300 shadow-lg shadow-yellow-400/20 transition-all transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none"
+                            disabled={!canProceed} 
+                            className="w-full py-4 rounded-xl bg-gradient-to-r from-yellow-400 to-yellow-500 text-[#1a365d] font-bold text-lg hover:to-yellow-300 shadow-lg shadow-yellow-400/20 transition-all transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none flex items-center justify-center gap-2"
                         >
-                            Proceed to Review
+                            <span>Proceed to Security Check</span>
+                            <i className="fas fa-arrow-right"></i>
                         </button>
                         
                         {!isFormValid && amountNum > 0 && (
-                            <p className="text-center text-xs text-red-400">Please complete all beneficiary details.</p>
+                            <p className="text-center text-xs text-red-400">Please complete all required fields.</p>
                         )}
                     </div>
                 </div>

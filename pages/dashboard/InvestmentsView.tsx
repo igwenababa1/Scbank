@@ -1,211 +1,175 @@
 
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { Chart, registerables } from 'chart.js';
-// FIX: Corrected import path
-import { PORTFOLIO_SUMMARY, HOLDINGS, ASSET_ALLOCATION, MARKET_MOVERS, WATCHLIST } from '../../constants';
+import { HOLDINGS, ASSET_ALLOCATION, MARKET_MOVERS, WATCHLIST } from '../../constants';
 import { formatCurrency } from '../../utils/formatters';
-// FIX: Corrected import path
-import type { Holding, AssetAllocationItem, MarketMover, WatchlistItem } from '../../types';
+import type { Holding, AssetAllocationItem, MarketMover, WatchlistItem, ViewType } from '../../types';
 import TradeModal from '../../components/dashboard/investments/TradeModal';
 import HoldingSparkline from '../../components/dashboard/investments/HoldingSparkline';
 import HoldingDetailModal from '../../components/dashboard/investments/HoldingDetailModal';
 
 Chart.register(...registerables);
 
-const StatCard: React.FC<{ label: string; value: string; subValue?: string; valueColor?: string; }> = ({ label, value, subValue, valueColor }) => (
-    <div className="bg-gray-800/50 backdrop-blur-sm p-5 rounded-xl border border-white/10 shadow-lg">
-        <p className="text-sm text-gray-400 font-semibold">{label}</p>
-        <p className={`text-2xl font-bold mt-1 ${valueColor || 'text-white'}`}>{value}</p>
-        {subValue && <p className={`text-sm font-semibold mt-1 ${valueColor || 'text-gray-400'}`}>{subValue}</p>}
+// --- Types & Mock Data for Simulation ---
+interface NewsItem {
+    id: string;
+    source: string;
+    headline: string;
+    time: string;
+    sentiment: 'positive' | 'negative' | 'neutral';
+}
+
+const MOCK_NEWS: NewsItem[] = [
+    { id: 'n1', source: 'Bloomberg', headline: 'Tech Sector Rallies as AI Chip Demand Surges', time: '2m ago', sentiment: 'positive' },
+    { id: 'n2', source: 'Reuters', headline: 'Fed Signals Potential Rate Cut in Q4', time: '15m ago', sentiment: 'positive' },
+    { id: 'n3', source: 'CNBC', headline: 'Oil Prices Stabilize Amid Geopolitical Tensions', time: '42m ago', sentiment: 'neutral' },
+    { id: 'n4', source: 'WSJ', headline: 'Market Volatility Index (VIX) Spikes 5%', time: '1h ago', sentiment: 'negative' },
+    { id: 'n5', source: 'Financial Times', headline: 'European Markets Close Higher on Earnings', time: '2h ago', sentiment: 'positive' },
+];
+
+// --- Helper Components ---
+
+const LivePrice: React.FC<{ value: number, previousValue: number }> = ({ value, previousValue }) => {
+    const [flash, setFlash] = useState<'up' | 'down' | null>(null);
+
+    useEffect(() => {
+        if (value > previousValue) {
+            setFlash('up');
+            setTimeout(() => setFlash(null), 1000);
+        } else if (value < previousValue) {
+            setFlash('down');
+            setTimeout(() => setFlash(null), 1000);
+        }
+    }, [value, previousValue]);
+
+    const colorClass = flash === 'up' ? 'text-green-400 bg-green-400/10' : flash === 'down' ? 'text-red-400 bg-red-400/10' : 'text-white';
+
+    return (
+        <span className={`transition-all duration-300 px-1 rounded ${colorClass}`}>
+            {formatCurrency(value)}
+        </span>
+    );
+};
+
+const StatCard: React.FC<{ label: string; value: string | React.ReactNode; subValue?: string; valueColor?: string; icon: string }> = ({ label, value, subValue, valueColor, icon }) => (
+    <div className="bg-[#1e293b]/60 backdrop-blur-md p-5 rounded-xl border border-white/5 shadow-lg hover:border-white/10 transition-all group">
+        <div className="flex justify-between items-start mb-2">
+            <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">{label}</p>
+            <i className={`fas ${icon} text-gray-600 group-hover:text-yellow-400 transition-colors`}></i>
+        </div>
+        <div className={`text-2xl font-bold mt-1 ${valueColor || 'text-white'}`}>{value}</div>
+        {subValue && <p className={`text-xs font-semibold mt-1 ${subValue.includes('+') ? 'text-green-400' : subValue.includes('-') ? 'text-red-400' : 'text-gray-400'}`}>{subValue}</p>}
     </div>
 );
 
-const AssetAllocationChart: React.FC<{ data: AssetAllocationItem[] }> = ({ data }) => {
-    const chartRef = useRef<HTMLCanvasElement>(null);
-
-    useEffect(() => {
-        let chartInstance: Chart | undefined;
-        if (chartRef.current) {
-            const ctx = chartRef.current.getContext('2d');
-            if (ctx) {
-                chartInstance = new Chart(ctx, {
-                    type: 'doughnut',
-                    data: {
-                        labels: data.map(d => d.name),
-                        datasets: [{
-                            data: data.map(d => d.value),
-                            backgroundColor: ['#1a365d', '#2d5c8a', '#e6b325', '#a9b7c6'],
-                            borderColor: '#1f2937',
-                            borderWidth: 2,
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: {
-                                position: 'right',
-                                labels: { color: '#d1d5db' }
-                            },
-                        },
-                        cutout: '60%',
-                    }
-                });
-            }
-        }
-        return () => chartInstance?.destroy();
-    }, [data]);
+const SentimentGauge: React.FC<{ score: number }> = ({ score }) => {
+    // Score 0-100. <30 Fear, >70 Greed
+    const rotation = (score / 100) * 180 - 90; // -90 to 90 deg
     
-    return <div className="relative h-48"><canvas ref={chartRef}></canvas></div>;
-};
-
-const MarketWatch: React.FC = () => {
-    const [activeTab, setActiveTab] = useState<'movers' | 'watchlist'>('movers');
-
-    const renderList = (items: (MarketMover | WatchlistItem)[]) => (
-        <div className="space-y-3">
-            {items.map(item => (
-                <div key={item.id} className="flex justify-between items-center">
-                    <div className="flex items-center gap-3">
-                        <img src={item.logoUrl} alt={item.name} className="w-8 h-8 rounded-full bg-white p-1" />
-                        <div>
-                            <p className="font-bold">{item.symbol}</p>
-                            <p className="text-xs text-gray-400 truncate w-24">{item.name}</p>
-                        </div>
-                    </div>
-                    <div className="text-right">
-                        <p className="font-semibold">{formatCurrency(item.price)}</p>
-                        <p className={`text-sm font-semibold ${item.changePercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                            {item.changePercent.toFixed(2)}%
-                        </p>
-                    </div>
-                </div>
-            ))}
-        </div>
-    );
+    let label = "Neutral";
+    let color = "text-yellow-400";
+    if (score < 30) { label = "Fear"; color = "text-red-500"; }
+    else if (score > 70) { label = "Greed"; color = "text-green-500"; }
 
     return (
-        <div className="bg-gray-800/50 backdrop-blur-sm p-6 rounded-xl border border-white/10 shadow-lg h-full">
-            <div className="flex border-b border-white/10 mb-4">
-                <button onClick={() => setActiveTab('movers')} className={`pb-2 px-2 text-sm font-semibold ${activeTab === 'movers' ? 'text-yellow-400 border-b-2 border-yellow-400' : 'text-gray-400'}`}>Top Movers</button>
-                <button onClick={() => setActiveTab('watchlist')} className={`pb-2 px-2 text-sm font-semibold ${activeTab === 'watchlist' ? 'text-yellow-400 border-b-2 border-yellow-400' : 'text-gray-400'}`}>Watchlist</button>
+        <div className="flex flex-col items-center justify-center h-full">
+            <div className="relative w-40 h-20 overflow-hidden mb-2">
+                <div className="absolute top-0 left-0 w-40 h-40 rounded-full border-[10px] border-gray-700 border-b-0 border-r-0 border-l-0" style={{ transform: 'rotate(-45deg)' }}></div>
+                <div className="absolute top-0 left-0 w-40 h-40 rounded-full border-[10px] border-transparent border-t-green-500/50" style={{ transform: 'rotate(45deg)' }}></div>
+                <div className="absolute top-0 left-0 w-40 h-40 rounded-full border-[10px] border-transparent border-l-red-500/50" style={{ transform: 'rotate(-45deg)' }}></div>
+                
+                {/* Needle */}
+                <div 
+                    className="absolute bottom-0 left-1/2 w-1 h-20 bg-white origin-bottom rounded-full shadow-lg transition-transform duration-1000 ease-out"
+                    style={{ transform: `translateX(-50%) rotate(${rotation}deg)` }}
+                ></div>
+                <div className="absolute bottom-0 left-1/2 w-4 h-4 bg-white rounded-full transform -translate-x-1/2 translate-y-1/2 shadow-lg"></div>
             </div>
-            {activeTab === 'movers' ? renderList(MARKET_MOVERS) : renderList(WATCHLIST)}
+            <p className="text-xs text-gray-400 uppercase tracking-widest">Market Sentiment</p>
+            <p className={`text-xl font-bold ${color}`}>{label} ({score})</p>
         </div>
     );
 };
 
-type SortKey = 'symbol' | 'marketValue' | 'price' | 'change';
-
-const InvestmentsView: React.FC = () => {
+const InvestmentsView: React.FC<{ setActiveView: (view: ViewType) => void }> = ({ setActiveView }) => {
+    // State
+    const [liveHoldings, setLiveHoldings] = useState<Holding[]>(HOLDINGS);
+    const [previousHoldings, setPreviousHoldings] = useState<Holding[]>(HOLDINGS);
+    const [timeRange, setTimeRange] = useState('1Y');
+    const [marketStatus, setMarketStatus] = useState('OPEN');
+    const [portfolioValue, setPortfolioValue] = useState(120450.90);
+    const [dayChange, setDayChange] = useState(1250.80);
+    
+    // Modals & Interaction
     const [isTradeModalOpen, setIsTradeModalOpen] = useState(false);
     const [tradeDetails, setTradeDetails] = useState<{ holding: Holding | null, type: 'Buy' | 'Sell' }>({ holding: null, type: 'Buy' });
     const [selectedHolding, setSelectedHolding] = useState<Holding | null>(null);
-    const [timeRange, setTimeRange] = useState('1Y');
-    const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'asc' | 'desc' } | null>(null);
-    
+    const [sortConfig, setSortConfig] = useState<{ key: keyof Holding | 'marketValue'; direction: 'asc' | 'desc' } | null>(null);
+
+    // Chart Refs
     const portfolioChartRef = useRef<HTMLCanvasElement>(null);
     const chartInstanceRef = useRef<Chart | null>(null);
+    const allocationChartRef = useRef<HTMLCanvasElement>(null);
+    const allocationInstanceRef = useRef<Chart | null>(null);
 
-    const handleOpenTradeModal = (holding: Holding, type: 'Buy' | 'Sell') => {
-        setTradeDetails({ holding, type });
-        setIsTradeModalOpen(true);
-    };
-
-    const handleConfirmTrade = (shares: number) => {
-        alert(`Your order to ${tradeDetails.type.toLowerCase()} ${shares} share(s) of ${tradeDetails.holding?.symbol} has been submitted.`);
-        setIsTradeModalOpen(false);
-    };
-    
-    const handleOpenDetailModal = (holding: Holding) => {
-        setSelectedHolding(holding);
-    };
-    
-    const handleBuyFromDetail = (holding: Holding) => {
-        setSelectedHolding(null);
-        handleOpenTradeModal(holding, 'Buy');
-    };
-    
-    const handleSellFromDetail = (holding: Holding) => {
-        setSelectedHolding(null);
-        handleOpenTradeModal(holding, 'Sell');
-    };
-
-    const requestSort = (key: SortKey) => {
-        let direction: 'asc' | 'desc' = 'asc';
-        if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
-            direction = 'desc';
-        }
-        setSortConfig({ key, direction });
-    };
-
-    const sortedHoldings = useMemo(() => {
-        let sortableItems = [...HOLDINGS];
-        if (sortConfig !== null) {
-            sortableItems.sort((a, b) => {
-                let aValue: any;
-                let bValue: any;
-
-                switch (sortConfig.key) {
-                    case 'marketValue':
-                        aValue = a.shares * a.price;
-                        bValue = b.shares * b.price;
-                        break;
-                    case 'symbol':
-                        aValue = a.symbol;
-                        bValue = b.symbol;
-                        break;
-                    default:
-                        aValue = a[sortConfig.key as keyof Holding];
-                        bValue = b[sortConfig.key as keyof Holding];
-                }
-
-                if (aValue < bValue) {
-                    return sortConfig.direction === 'asc' ? -1 : 1;
-                }
-                if (aValue > bValue) {
-                    return sortConfig.direction === 'asc' ? 1 : -1;
-                }
-                return 0;
-            });
-        }
-        return sortableItems;
-    }, [sortConfig]);
-
-    const SortIndicator: React.FC<{ currentSort: typeof sortConfig, sortKey: SortKey }> = ({ currentSort, sortKey }) => {
-        if (currentSort?.key !== sortKey) return <i className="fas fa-sort text-gray-600 ml-1 text-xs"></i>;
-        return currentSort.direction === 'asc' 
-            ? <i className="fas fa-sort-up text-yellow-400 ml-1 text-xs align-bottom"></i>
-            : <i className="fas fa-sort-down text-yellow-400 ml-1 text-xs align-top"></i>;
-    };
-
-    const chartData = {
-        '1M': { labels: ['W1', 'W2', 'W3', 'W4'], data: [118000, 117000, 119000, 120450] },
-        '6M': { labels: ['May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct'], data: [108000, 112000, 115000, 118000, 117000, 120450] },
-        '1Y': { labels: ['Jan', 'Mar', 'May', 'Jul', 'Sep', 'Oct'], data: [100000, 105000, 108000, 115000, 117000, 120450] },
-        'ALL': { labels: ['2021', '2022', '2023'], data: [80000, 100000, 120450] },
-    };
-
+    // --- Simulation Logic ---
     useEffect(() => {
-        if (chartInstanceRef.current) {
-            chartInstanceRef.current.destroy();
-        }
+        const interval = setInterval(() => {
+            setPreviousHoldings(liveHoldings);
+            setLiveHoldings(current => 
+                current.map(h => {
+                    const volatility = 0.0015; // 0.15% max move per tick
+                    const move = 1 + (Math.random() * volatility * 2 - volatility);
+                    const newPrice = h.price * move;
+                    const priceDiff = newPrice - h.price;
+                    return {
+                        ...h,
+                        price: newPrice,
+                        change: h.change + priceDiff,
+                        changePercent: ((h.change + priceDiff) / (newPrice - (h.change + priceDiff))) * 100
+                    };
+                })
+            );
+        }, 3000); // Tick every 3 seconds
+
+        return () => clearInterval(interval);
+    }, [liveHoldings]);
+
+    // Update Portfolio Totals
+    useEffect(() => {
+        const total = liveHoldings.reduce((sum, h) => sum + (h.price * h.shares), 0) + 15230.40; // + Cash
+        const change = liveHoldings.reduce((sum, h) => sum + (h.change * h.shares), 0);
+        setPortfolioValue(total);
+        setDayChange(change);
+    }, [liveHoldings]);
+
+    // --- Charting ---
+    useEffect(() => {
+        if (chartInstanceRef.current) chartInstanceRef.current.destroy();
         if (portfolioChartRef.current) {
             const ctx = portfolioChartRef.current.getContext('2d');
             if (ctx) {
+                // Mock Data Generator based on TimeRange
+                const points = timeRange === '1D' ? 24 : timeRange === '1W' ? 7 : timeRange === '1M' ? 30 : 12;
+                const labels = Array.from({length: points}, (_, i) => i.toString());
+                const data = Array.from({length: points}, () => 100000 + Math.random() * 20000);
+                
                 const gradient = ctx.createLinearGradient(0, 0, 0, 300);
-                gradient.addColorStop(0, 'rgba(230, 179, 37, 0.3)');
-                gradient.addColorStop(1, 'rgba(230, 179, 37, 0)');
+                gradient.addColorStop(0, 'rgba(250, 204, 21, 0.2)'); // Yellow-400
+                gradient.addColorStop(1, 'rgba(250, 204, 21, 0)');
 
                 chartInstanceRef.current = new Chart(ctx, {
                     type: 'line',
                     data: {
-                        labels: chartData[timeRange as keyof typeof chartData].labels,
+                        labels,
                         datasets: [{
-                            label: 'Portfolio Value',
-                            data: chartData[timeRange as keyof typeof chartData].data,
-                            borderColor: '#e6b325',
+                            data,
+                            borderColor: '#facc15',
                             backgroundColor: gradient,
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            pointHoverRadius: 4,
+                            pointBackgroundColor: '#facc15',
                             tension: 0.4,
                             fill: true,
                         }],
@@ -213,119 +177,221 @@ const InvestmentsView: React.FC = () => {
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
-                        plugins: { legend: { display: false } },
+                        plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false } },
                         scales: { 
-                            y: { ticks: { callback: (value) => formatCurrency(value as number), color: '#9ca3af' }, grid: { color: 'rgba(255,255,255,0.1)' } },
-                            x: { ticks: { color: '#9ca3af' }, grid: { display: false } },
+                            x: { display: false }, 
+                            y: { display: false } // Minimalist look
+                        },
+                        interaction: {
+                            mode: 'nearest',
+                            axis: 'x',
+                            intersect: false
                         }
                     },
                 });
             }
         }
-        return () => {
-            chartInstanceRef.current?.destroy();
-        };
     }, [timeRange]);
 
-    return (
-        <div 
-            className="min-h-full bg-gray-900 text-white p-8 bg-cover bg-center"
-            style={{ backgroundImage: "url('https://images.unsplash.com/photo-1611015940293-9a37c5f87b6a?q=80&w=2070&auto=format&fit=crop')" }}
-        >
-            <div className="absolute inset-0 bg-gray-900/80 backdrop-blur-sm"></div>
-            <div className="relative">
-                <h1 className="text-4xl font-bold mb-8 text-shadow-lg">Investment Portfolio</h1>
+    useEffect(() => {
+        if (allocationInstanceRef.current) allocationInstanceRef.current.destroy();
+        if (allocationChartRef.current) {
+            const ctx = allocationChartRef.current.getContext('2d');
+            if (ctx) {
+                allocationInstanceRef.current = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ASSET_ALLOCATION.map(d => d.name),
+                        datasets: [{
+                            data: ASSET_ALLOCATION.map(d => d.value),
+                            backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#6366f1'],
+                            borderColor: '#0f172a',
+                            borderWidth: 4,
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        cutout: '75%',
+                        plugins: { legend: { display: false } }
+                    }
+                });
+            }
+        }
+    }, []);
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                    <StatCard label="Total Value" value={formatCurrency(PORTFOLIO_SUMMARY.totalValue)} />
-                    <StatCard 
-                        label="Day's Gain/Loss" 
-                        value={formatCurrency(PORTFOLIO_SUMMARY.dayChange)} 
-                        subValue={`${PORTFOLIO_SUMMARY.dayChange >= 0 ? '+' : ''}${PORTFOLIO_SUMMARY.dayChangePercent.toFixed(2)}%`}
-                        valueColor={PORTFOLIO_SUMMARY.dayChange >= 0 ? 'text-green-400' : 'text-red-400'}
-                    />
-                    <StatCard label="Buying Power" value={formatCurrency(PORTFOLIO_SUMMARY.buyingPower)} />
-                </div>
+    // --- Sorting ---
+    const sortedHoldings = useMemo(() => {
+        if (!sortConfig) return liveHoldings;
+        return [...liveHoldings].sort((a, b) => {
+            let aVal: any = a[sortConfig.key as keyof Holding];
+            let bVal: any = b[sortConfig.key as keyof Holding];
+            
+            if (sortConfig.key === 'marketValue') {
+                aVal = a.price * a.shares;
+                bVal = b.price * b.shares;
+            }
+
+            if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+            if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+            return 0;
+        });
+    }, [liveHoldings, sortConfig]);
+
+    const handleSort = (key: keyof Holding | 'marketValue') => {
+        setSortConfig(current => ({
+            key,
+            direction: current?.key === key && current.direction === 'asc' ? 'desc' : 'asc'
+        }));
+    };
+
+    // --- Handlers ---
+    const handleTrade = (holding: Holding, type: 'Buy' | 'Sell') => {
+        setTradeDetails({ holding, type });
+        setIsTradeModalOpen(true);
+    };
+
+    return (
+        <div className="relative min-h-full bg-[#0b1120] text-white font-sans selection:bg-yellow-500/30">
+            {/* Background */}
+            <div 
+                className="absolute inset-0 z-0 opacity-20 pointer-events-none"
+                style={{ 
+                    backgroundImage: "url('https://images.unsplash.com/photo-1642543492481-44e81e3914a7?q=80&w=2070&auto=format&fit=crop')",
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center'
+                }}
+            />
+            <div className="absolute inset-0 z-0 bg-gradient-to-b from-[#0b1120]/90 via-[#0b1120]/95 to-[#0b1120]"></div>
+
+            <div className="relative z-10 p-6 max-w-[1800px] mx-auto">
                 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    <div className="lg:col-span-2 space-y-8">
-                        <div className="bg-gray-800/50 backdrop-blur-sm p-6 rounded-xl border border-white/10 shadow-lg">
-                            <div className="flex justify-between items-center mb-4">
-                                <h2 className="text-xl font-bold">Performance</h2>
-                                <div className="flex gap-1 bg-gray-900/50 p-1 rounded-md">
-                                    {Object.keys(chartData).map(range => (
-                                        <button key={range} onClick={() => setTimeRange(range)} className={`px-3 py-1 text-xs font-semibold rounded ${timeRange === range ? 'bg-yellow-500 text-gray-900' : 'text-gray-400 hover:bg-gray-700'}`}>{range}</button>
+                {/* Header */}
+                <div className="flex justify-between items-end mb-8 border-b border-white/10 pb-6">
+                    <div>
+                        <div className="flex items-center gap-3 mb-2">
+                            <h1 className="text-4xl font-bold tracking-tight text-white">Investment Command</h1>
+                            <span className="px-2 py-0.5 rounded bg-green-500/10 border border-green-500/30 text-green-400 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 animate-pulse">
+                                <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                                Market Open
+                            </span>
+                        </div>
+                        <p className="text-gray-400 text-sm">Real-time portfolio analytics and execution.</p>
+                    </div>
+                    <div className="flex gap-3">
+                         <button className="px-4 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-xs font-bold uppercase tracking-wider transition-colors">
+                            <i className="fas fa-file-pdf mr-2"></i> Statements
+                        </button>
+                        <button className="px-4 py-2 rounded-lg bg-yellow-500 text-black font-bold hover:bg-yellow-400 shadow-lg shadow-yellow-500/20 transition-all text-sm flex items-center gap-2">
+                            <i className="fas fa-plus"></i> Deposit Funds
+                        </button>
+                    </div>
+                </div>
+
+                {/* Top Stats Row */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                    <StatCard 
+                        label="Total Equity" 
+                        value={<LivePrice value={portfolioValue} previousValue={portfolioValue - 10} />} 
+                        icon="fa-wallet"
+                    />
+                    <StatCard 
+                        label="Day's P&L" 
+                        value={formatCurrency(dayChange)} 
+                        subValue={`${dayChange >= 0 ? '+' : ''}${(dayChange/portfolioValue*100).toFixed(2)}%`} 
+                        valueColor={dayChange >= 0 ? 'text-green-400' : 'text-red-400'}
+                        icon="fa-chart-line"
+                    />
+                    <StatCard 
+                        label="Buying Power" 
+                        value={formatCurrency(15230.40)} 
+                        icon="fa-bolt"
+                    />
+                    <StatCard 
+                        label="Margin Used" 
+                        value="$0.00" 
+                        subValue="0% Utilization"
+                        icon="fa-percent"
+                    />
+                </div>
+
+                <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+                    {/* Main Chart Area */}
+                    <div className="xl:col-span-2 space-y-6">
+                        <div className="bg-[#1e293b]/40 backdrop-blur-md border border-white/10 rounded-2xl p-6 shadow-2xl relative overflow-hidden">
+                             {/* Chart Controls */}
+                             <div className="flex justify-between items-center mb-6">
+                                <h2 className="text-lg font-bold text-white">Performance</h2>
+                                <div className="flex bg-black/20 p-1 rounded-lg">
+                                    {['1D', '1W', '1M', '3M', '1Y', 'ALL'].map(range => (
+                                        <button 
+                                            key={range} 
+                                            onClick={() => setTimeRange(range)}
+                                            className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${timeRange === range ? 'bg-white/10 text-yellow-400 shadow' : 'text-gray-500 hover:text-white'}`}
+                                        >
+                                            {range}
+                                        </button>
                                     ))}
                                 </div>
-                            </div>
-                            <div className="h-80 relative">
-                                <canvas ref={portfolioChartRef}></canvas>
-                            </div>
+                             </div>
+                             
+                             <div className="h-80 w-full relative">
+                                 <canvas ref={portfolioChartRef}></canvas>
+                             </div>
                         </div>
 
-                        <div className="bg-gray-800/50 backdrop-blur-sm rounded-xl border border-white/10 shadow-lg overflow-hidden">
-                            <h2 className="text-xl font-bold p-6">Your Holdings</h2>
+                        {/* Holdings Table */}
+                        <div className="bg-[#1e293b]/40 backdrop-blur-md border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
+                            <div className="p-5 border-b border-white/10 flex justify-between items-center bg-white/5">
+                                <h3 className="font-bold text-white">Positions</h3>
+                                <div className="flex gap-2">
+                                    <button className="w-8 h-8 rounded bg-black/20 flex items-center justify-center hover:bg-white/10 text-gray-400 hover:text-white"><i className="fas fa-search"></i></button>
+                                    <button className="w-8 h-8 rounded bg-black/20 flex items-center justify-center hover:bg-white/10 text-gray-400 hover:text-white"><i className="fas fa-filter"></i></button>
+                                </div>
+                            </div>
                             <div className="overflow-x-auto">
-                                <table className="w-full text-left">
-                                    <thead className="border-b border-white/10 bg-gray-900/30 text-xs uppercase text-gray-400">
+                                <table className="w-full text-left text-sm">
+                                    <thead className="bg-black/20 text-gray-400 text-xs uppercase font-bold">
                                         <tr>
-                                            <th 
-                                                className="p-4 pl-6 cursor-pointer hover:text-white transition-colors group select-none"
-                                                onClick={() => requestSort('symbol')}
-                                            >
-                                                Asset <SortIndicator currentSort={sortConfig} sortKey="symbol" />
-                                            </th>
-                                            <th 
-                                                className="p-4 text-right cursor-pointer hover:text-white transition-colors group select-none"
-                                                onClick={() => requestSort('marketValue')}
-                                            >
-                                                Market Value <SortIndicator currentSort={sortConfig} sortKey="marketValue" />
-                                            </th>
-                                            <th 
-                                                className="p-4 text-right cursor-pointer hover:text-white transition-colors group select-none"
-                                                onClick={() => requestSort('price')}
-                                            >
-                                                Price <SortIndicator currentSort={sortConfig} sortKey="price" />
-                                            </th>
-                                            <th 
-                                                className="p-4 text-right pr-6 cursor-pointer hover:text-white transition-colors group select-none"
-                                                onClick={() => requestSort('change')}
-                                            >
-                                                Day's Change <SortIndicator currentSort={sortConfig} sortKey="change" />
-                                            </th>
-                                            <th className="p-4 text-center w-32">7-Day Trend</th>
+                                            <th className="p-4 cursor-pointer hover:text-white" onClick={() => handleSort('symbol')}>Symbol</th>
+                                            <th className="p-4 text-right cursor-pointer hover:text-white" onClick={() => handleSort('price')}>Last Price</th>
+                                            <th className="p-4 text-right cursor-pointer hover:text-white" onClick={() => handleSort('change')}>Day Change</th>
+                                            <th className="p-4 text-right cursor-pointer hover:text-white" onClick={() => handleSort('marketValue')}>Value</th>
+                                            <th className="p-4 text-center">Trend</th>
+                                            <th className="p-4 text-right">Action</th>
                                         </tr>
                                     </thead>
-                                    <tbody>
+                                    <tbody className="divide-y divide-white/5">
                                         {sortedHoldings.map(h => (
-                                            <tr key={h.id} onClick={() => handleOpenDetailModal(h)} className="border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer">
-                                                <td className="p-4 pl-6">
-                                                    <div className="flex items-center gap-4">
-                                                        <img src={h.logoUrl} alt={h.name} className="w-8 h-8 rounded-full bg-white p-0.5" />
+                                            <tr key={h.id} onClick={() => setSelectedHolding(h)} className="hover:bg-white/5 transition-colors cursor-pointer group">
+                                                <td className="p-4">
+                                                    <div className="flex items-center gap-3">
+                                                        <img src={h.logoUrl} className="w-8 h-8 rounded-full bg-white p-0.5" />
                                                         <div>
-                                                            <p className="font-bold">{h.symbol}</p>
-                                                            <p className="text-sm text-gray-400 truncate max-w-[120px]">{h.name}</p>
+                                                            <p className="font-bold text-white">{h.symbol}</p>
+                                                            <p className="text-[10px] text-gray-500">{h.shares} Shares</p>
                                                         </div>
                                                     </div>
                                                 </td>
-                                                <td className="p-4 text-right">
-                                                    <p className="font-semibold">{formatCurrency(h.shares * h.price)}</p>
-                                                    <p className="text-sm text-gray-400">{h.shares.toFixed(2)} shares</p>
+                                                <td className="p-4 text-right font-mono font-medium">
+                                                    <LivePrice value={h.price} previousValue={previousHoldings.find(p => p.id === h.id)?.price || h.price} />
                                                 </td>
-                                                <td className="p-4 text-right font-semibold">{formatCurrency(h.price)}</td>
-                                                <td className="p-4 text-right pr-6">
-                                                    <div className="flex items-center justify-end gap-4">
-                                                        <div className={`font-semibold ${h.change >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                                            {formatCurrency(h.change)} ({h.changePercent.toFixed(2)}%)
-                                                        </div>
-                                                        <div className="flex items-center gap-2">
-                                                            <button onClick={(e) => { e.stopPropagation(); handleOpenTradeModal(h, 'Buy'); }} className="px-3 py-1 text-sm rounded-md font-semibold text-green-300 bg-green-500/20 hover:bg-green-500/40">Buy</button>
-                                                            <button onClick={(e) => { e.stopPropagation(); handleOpenTradeModal(h, 'Sell'); }} className="px-3 py-1 text-sm rounded-md font-semibold text-red-300 bg-red-500/20 hover:bg-red-500/40">Sell</button>
-                                                        </div>
+                                                <td className="p-4 text-right font-mono">
+                                                    <span className={h.change >= 0 ? 'text-green-400' : 'text-red-400'}>
+                                                        {h.change >= 0 ? '+' : ''}{h.change.toFixed(2)} <span className="text-[10px] opacity-70">({h.changePercent.toFixed(2)}%)</span>
+                                                    </span>
+                                                </td>
+                                                <td className="p-4 text-right font-mono text-white">
+                                                    {formatCurrency(h.price * h.shares)}
+                                                </td>
+                                                <td className="p-4 h-12 w-24">
+                                                     <HoldingSparkline data={h.historicalData} />
+                                                </td>
+                                                <td className="p-4 text-right" onClick={e => e.stopPropagation()}>
+                                                    <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <button onClick={() => handleTrade(h, 'Buy')} className="px-3 py-1 rounded bg-green-500/20 text-green-400 hover:bg-green-500 hover:text-black text-xs font-bold transition-colors">Buy</button>
+                                                        <button onClick={() => handleTrade(h, 'Sell')} className="px-3 py-1 rounded bg-red-500/20 text-red-400 hover:bg-red-500 hover:text-black text-xs font-bold transition-colors">Sell</button>
                                                     </div>
-                                                </td>
-                                                <td className="p-4 h-16 w-32">
-                                                    <HoldingSparkline data={h.historicalData} />
                                                 </td>
                                             </tr>
                                         ))}
@@ -335,23 +401,70 @@ const InvestmentsView: React.FC = () => {
                         </div>
                     </div>
 
-                    <div className="space-y-8">
-                        <div className="bg-gray-800/50 backdrop-blur-sm p-6 rounded-xl border border-white/10 shadow-lg">
-                            <h2 className="text-xl font-bold mb-4">Asset Allocation</h2>
-                            <AssetAllocationChart data={ASSET_ALLOCATION} />
+                    {/* Right Sidebar: Intelligence */}
+                    <div className="space-y-6">
+                        {/* Sentiment & Allocation */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-1 gap-6">
+                            <div className="bg-[#1e293b]/40 backdrop-blur-md border border-white/10 rounded-2xl p-6 shadow-lg flex flex-col items-center">
+                                <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-4 w-full">Allocation</h3>
+                                <div className="h-48 w-48 relative">
+                                    <canvas ref={allocationChartRef}></canvas>
+                                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                        <span className="text-xl font-bold text-white">Divsf.</span>
+                                    </div>
+                                </div>
+                                <div className="flex gap-4 mt-4 text-xs text-gray-400">
+                                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500"></span> Stocks</span>
+                                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500"></span> Bonds</span>
+                                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-yellow-500"></span> Real Est.</span>
+                                </div>
+                            </div>
+
+                            <div className="bg-[#1e293b]/40 backdrop-blur-md border border-white/10 rounded-2xl p-6 shadow-lg">
+                                <SentimentGauge score={65} />
+                            </div>
                         </div>
-                        <MarketWatch />
+
+                        {/* Live News Feed */}
+                        <div className="bg-[#1e293b]/40 backdrop-blur-md border border-white/10 rounded-2xl shadow-lg overflow-hidden flex flex-col h-[400px]">
+                            <div className="p-4 border-b border-white/10 bg-white/5">
+                                <h3 className="font-bold text-white flex items-center gap-2">
+                                    <i className="fas fa-newspaper text-blue-400"></i> Market Wire
+                                </h3>
+                            </div>
+                            <div className="flex-grow overflow-y-auto p-4 space-y-4">
+                                {MOCK_NEWS.map(news => (
+                                    <div key={news.id} className="flex gap-3 group cursor-pointer">
+                                        <div className={`w-1 h-full min-h-[40px] rounded-full ${news.sentiment === 'positive' ? 'bg-green-500' : news.sentiment === 'negative' ? 'bg-red-500' : 'bg-gray-500'}`}></div>
+                                        <div>
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <span className="text-[10px] font-bold bg-white/10 px-1.5 rounded text-gray-300">{news.source}</span>
+                                                <span className="text-[10px] text-gray-500">{news.time}</span>
+                                            </div>
+                                            <p className="text-sm text-gray-300 font-medium leading-snug group-hover:text-yellow-400 transition-colors">{news.headline}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                             <button className="p-3 text-xs font-bold text-center text-gray-400 hover:text-white hover:bg-white/5 transition-colors border-t border-white/10">
+                                View All News
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
 
+            {/* Modals */}
             {isTradeModalOpen && tradeDetails.holding && (
                 <TradeModal
                     isOpen={isTradeModalOpen}
                     onClose={() => setIsTradeModalOpen(false)}
                     holding={tradeDetails.holding}
                     tradeType={tradeDetails.type}
-                    onConfirmTrade={handleConfirmTrade}
+                    onConfirmTrade={(shares) => {
+                         alert(`Order Placed: ${tradeDetails.type} ${shares} shares of ${tradeDetails.holding?.symbol}`);
+                         setIsTradeModalOpen(false);
+                    }}
                 />
             )}
 
@@ -360,8 +473,8 @@ const InvestmentsView: React.FC = () => {
                     isOpen={!!selectedHolding}
                     onClose={() => setSelectedHolding(null)}
                     holding={selectedHolding}
-                    onBuy={handleBuyFromDetail}
-                    onSell={handleSellFromDetail}
+                    onBuy={(h) => handleTrade(h, 'Buy')}
+                    onSell={(h) => handleTrade(h, 'Sell')}
                 />
             )}
         </div>
