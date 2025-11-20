@@ -11,6 +11,7 @@ import LiveVoiceAssistant from '../../components/dashboard/LiveVoiceAssistant';
 import SessionInfoWidget from '../../components/dashboard/dashboard/SessionInfoWidget';
 import MarketTicker from '../../components/dashboard/dashboard/MarketTicker';
 import PremiumCardsCarousel from '../../components/dashboard/dashboard/PremiumCardsCarousel';
+import ScanPayModal from '../../components/dashboard/dashboard/ScanPayModal';
 import { ACCOUNTS } from '../../constants';
 import { formatCurrency } from '../../utils/formatters';
 import { useCurrency } from '../../contexts/GlobalSettingsContext';
@@ -22,6 +23,7 @@ interface DashboardViewProps {
 const DashboardView: React.FC<DashboardViewProps> = ({ setActiveView }) => {
     const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
     const [isAssistantOpen, setIsAssistantOpen] = useState(false);
+    const [isScanPayOpen, setIsScanPayOpen] = useState(false);
     const { currency, exchangeRate, language } = useCurrency();
 
     const totalAssets = ACCOUNTS.filter(a => a.type !== 'Credit').reduce((sum, item) => sum + item.balance, 0);
@@ -69,8 +71,8 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveView }) => {
                         <QuickActionButton icon="fa-file-invoice-dollar" label="Pay Bills" onClick={() => setActiveView('payments')} />
                         <QuickActionButton icon="fa-exchange-alt" label="Exchange" onClick={() => setActiveView('network')} />
                         <QuickActionButton icon="fa-chart-line" label="Invest" onClick={() => setActiveView('investments')} />
-                        <QuickActionButton icon="fa-qrcode" label="Scan to Pay" onClick={() => alert('Scanner opening...')} />
-                        <QuickActionButton icon="fa-ellipsis-h" label="More" onClick={() => {}} />
+                        <QuickActionButton icon="fa-qrcode" label="Scan to Pay" onClick={() => setIsScanPayOpen(true)} />
+                        <QuickActionButton icon="fa-ellipsis-h" label="More" onClick={() => setActiveView('apps')} />
                     </div>
 
                     {/* Main Grid */}
@@ -98,7 +100,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveView }) => {
                                         <span className="px-2 py-0.5 bg-[#e6b325] text-[#1a365d] text-[10px] font-bold rounded uppercase">Private</span>
                                      </div>
                                      <p className="text-gray-300 text-sm mb-4">Your dedicated relationship manager, Sarah, is available.</p>
-                                     <button className="w-full py-3 rounded-lg bg-white text-[#1a365d] font-bold text-sm hover:bg-gray-100 transition-colors">
+                                     <button onClick={() => setActiveView('support')} className="w-full py-3 rounded-lg bg-white text-[#1a365d] font-bold text-sm hover:bg-gray-100 transition-colors">
                                          Contact Relationship Manager
                                      </button>
                                 </div>
@@ -114,6 +116,11 @@ const DashboardView: React.FC<DashboardViewProps> = ({ setActiveView }) => {
                     isOpen={isTransferModalOpen}
                     onClose={() => setIsTransferModalOpen(false)}
                     setActiveView={setActiveView}
+                />
+                
+                <ScanPayModal 
+                    isOpen={isScanPayOpen}
+                    onClose={() => setIsScanPayOpen(false)}
                 />
                 
                 {/* Voice Assistant FAB */}

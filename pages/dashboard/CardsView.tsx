@@ -1,8 +1,10 @@
+
 import React, { useState } from 'react';
 import { ACCOUNTS, CARDS } from '../../constants';
 import type { Card, Account } from '../../types';
 import { formatCurrency } from '../../utils/formatters';
 import { useCurrency } from '../../contexts/GlobalSettingsContext';
+import CardDetailsModal from '../../components/dashboard/cards/CardDetailsModal';
 
 const ControlButton: React.FC<{ icon: string; label: string; onClick?: () => void; disabled?: boolean; isFrozen?: boolean; isAction?: boolean }> = ({ icon, label, onClick, disabled, isFrozen, isAction }) => (
     <button
@@ -25,6 +27,9 @@ const ControlButton: React.FC<{ icon: string; label: string; onClick?: () => voi
 const CardsView: React.FC = () => {
     const [isBalanceHidden, setIsBalanceHidden] = useState(false);
     const [cards, setCards] = useState<Card[]>(CARDS);
+    const [selectedCardForDetails, setSelectedCardForDetails] = useState<Card | null>(null);
+    const [showWalletToast, setShowWalletToast] = useState(false);
+    
     const { currency, exchangeRate, language } = useCurrency();
 
     const handleToggleFreeze = (id: string) => {
@@ -33,6 +38,11 @@ const CardsView: React.FC = () => {
                 card.id === id ? { ...card, isFrozen: !card.isFrozen } : card
             )
         );
+    };
+    
+    const handleAddToWallet = () => {
+        setShowWalletToast(true);
+        setTimeout(() => setShowWalletToast(false), 3000);
     };
 
     const totalBalance = ACCOUNTS.reduce((sum, acc) => sum + acc.balance, 0);
@@ -55,7 +65,7 @@ const CardsView: React.FC = () => {
     };
 
     return (
-        <div className="p-8 bg-gray-50 dark:bg-slate-900 min-h-full">
+        <div className="p-8 bg-gray-50 dark:bg-slate-900 min-h-full relative">
             {/* Header */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
                 <div className="flex items-center gap-4">
@@ -95,14 +105,14 @@ const CardsView: React.FC = () => {
                                 <p className="text-3xl font-bold text-gray-800 dark:text-gray-100">{renderBalance(checkingAccount.balance)}</p>
                                 <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 md:grid-cols-2 gap-2">
                                      <ControlButton icon={checkingCard.isFrozen ? "fa-unlock" : "fa-snowflake"} label={checkingCard.isFrozen ? 'Unfreeze' : 'Freeze'} onClick={() => handleToggleFreeze(checkingCard.id)} isFrozen={checkingCard.isFrozen}/>
-                                     <ControlButton icon="fa-sliders-h" label="Details" disabled={checkingCard.isFrozen} />
-                                     <ControlButton icon="fa-wallet" label="Add to Wallet" disabled={checkingCard.isFrozen} />
-                                     <ControlButton icon="fa-ellipsis-h" label="More" disabled={checkingCard.isFrozen} />
+                                     <ControlButton icon="fa-sliders-h" label="Details" disabled={checkingCard.isFrozen} onClick={() => setSelectedCardForDetails(checkingCard)} />
+                                     <ControlButton icon="fa-wallet" label="Add to Wallet" disabled={checkingCard.isFrozen} onClick={handleAddToWallet} />
+                                     <ControlButton icon="fa-ellipsis-h" label="More" disabled={checkingCard.isFrozen} onClick={() => alert('Additional options menu')} />
                                 </div>
                             </div>
-                            <div className="md:col-span-2 relative card-gloss w-full max-w-lg aspect-[1.586] mx-auto rounded-xl shadow-xl text-white p-6 flex flex-col justify-between overflow-hidden self-center">
+                            <div className="md:col-span-2 relative card-gloss w-full max-w-lg aspect-[1.586] mx-auto rounded-xl shadow-xl text-white p-6 flex flex-col justify-between overflow-hidden self-center group">
                                 <img src="https://images.unsplash.com/photo-1620712943543-95fc69afd3a5?q=80&w=2070&auto=format&fit=crop" alt="Debit Card" className="absolute inset-0 w-full h-full object-cover" />
-                                <div className="absolute inset-0 bg-black/30"></div>
+                                <div className="absolute inset-0 bg-black/30 group-hover:bg-black/20 transition-colors"></div>
                                 {checkingCard.isFrozen && (<div className="absolute inset-0 bg-blue-900/70 backdrop-blur-sm flex items-center justify-center z-20"><i className="fas fa-snowflake text-5xl text-white/80"></i></div>)}
                                 <div className="relative z-10 flex justify-between items-start">
                                     <i className="fab fa-cc-visa text-5xl"></i>
@@ -146,9 +156,9 @@ const CardsView: React.FC = () => {
                                 </div>
                                 <p className="text-2xl font-bold text-red-500 dark:text-red-400">{renderBalance(creditAccount.balance)}</p>
                              </div>
-                            <div className="relative card-gloss w-full max-w-sm aspect-[1.586] mx-auto rounded-xl shadow-xl text-white p-5 flex flex-col justify-between overflow-hidden my-4">
+                            <div className="relative card-gloss w-full max-w-sm aspect-[1.586] mx-auto rounded-xl shadow-xl text-white p-5 flex flex-col justify-between overflow-hidden my-4 group">
                                 <img src="https://images.unsplash.com/photo-1535132819232-a4c103a5b65f?q=80&w=1932&auto=format&fit=crop" alt="Credit Card" className="absolute inset-0 w-full h-full object-cover" />
-                                <div className="absolute inset-0 bg-black/40"></div>
+                                <div className="absolute inset-0 bg-black/40 group-hover:bg-black/30 transition-colors"></div>
                                 {creditCard.isFrozen && (<div className="absolute inset-0 bg-blue-900/70 backdrop-blur-sm flex items-center justify-center z-20"><i className="fas fa-snowflake text-4xl text-white/80"></i></div>)}
                                 <div className="relative z-10 flex justify-between items-start">
                                     <i className="fab fa-cc-mastercard text-4xl"></i>
@@ -168,6 +178,24 @@ const CardsView: React.FC = () => {
                     )}
                 </div>
             </div>
+            
+            {selectedCardForDetails && (
+                <CardDetailsModal 
+                    isOpen={!!selectedCardForDetails}
+                    onClose={() => setSelectedCardForDetails(null)}
+                    card={selectedCardForDetails}
+                />
+            )}
+            
+            {showWalletToast && (
+                <div className="fixed bottom-8 right-8 z-50 bg-black text-white px-6 py-3 rounded-xl shadow-2xl flex items-center gap-3 animate-fade-in-scale-up">
+                    <i className="fab fa-apple text-2xl"></i>
+                    <div>
+                        <p className="font-bold text-sm">Added to Wallet</p>
+                        <p className="text-xs text-gray-400">Card is ready for Apple Pay</p>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

@@ -20,6 +20,7 @@ const FxTerminal: React.FC = () => {
     const [rate, setRate] = useState(0.9245);
     const [trend, setTrend] = useState<number[]>([0.9240, 0.9242, 0.9238, 0.9244, 0.9241, 0.9245]);
     const [flash, setFlash] = useState<'up' | 'down' | null>(null);
+    const [tradeStatus, setTradeStatus] = useState<'idle' | 'executing' | 'success'>('idle');
 
     // Simulate Live Market Data
     useEffect(() => {
@@ -37,10 +38,18 @@ const FxTerminal: React.FC = () => {
         return () => clearInterval(interval);
     }, [rate]);
 
+    const handleTrade = () => {
+        setTradeStatus('executing');
+        setTimeout(() => {
+            setTradeStatus('success');
+            setTimeout(() => setTradeStatus('idle'), 2000);
+        }, 1500);
+    };
+
     const converted = parseFloat(amount) * rate;
 
     return (
-        <div className="bg-[#1e293b]/80 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-2xl relative overflow-hidden">
+        <div className="bg-[#1e293b]/80 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-2xl relative overflow-hidden h-full">
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-yellow-400 to-yellow-600"></div>
             
             <div className="flex justify-between items-center mb-6">
@@ -52,77 +61,94 @@ const FxTerminal: React.FC = () => {
                 </span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                <div className="bg-black/30 p-4 rounded-xl border border-white/5">
-                    <div className="flex justify-between text-xs text-gray-400 mb-2 uppercase font-bold">
-                        <span>Sell {base}</span>
-                        <span>Bal: $142,050.00</span>
+            {tradeStatus === 'success' ? (
+                <div className="flex flex-col items-center justify-center h-64 animate-fade-in-scale-up">
+                    <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mb-4">
+                        <i className="fas fa-check text-4xl text-green-400"></i>
                     </div>
-                    <div className="flex gap-2">
-                        <select 
-                            value={base} 
-                            onChange={e => setBase(e.target.value)}
-                            className="bg-white/10 border-none rounded-lg text-white font-bold focus:ring-0 cursor-pointer"
-                        >
-                            {CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.flag} {c.code}</option>)}
-                        </select>
-                        <input 
-                            type="number" 
-                            value={amount} 
-                            onChange={e => setAmount(e.target.value)} 
-                            className="w-full bg-transparent text-right text-2xl font-mono font-bold text-white focus:outline-none"
-                        />
-                    </div>
+                    <h4 className="text-xl font-bold text-white mb-2">Trade Executed</h4>
+                    <p className="text-gray-400 text-sm">Sold {formatCurrency(parseFloat(amount), base)} for {formatCurrency(converted, quote)}</p>
+                    <p className="text-xs text-gray-500 mt-1 font-mono">@ {rate.toFixed(5)}</p>
                 </div>
+            ) : (
+                <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                        <div className="bg-black/30 p-4 rounded-xl border border-white/5">
+                            <div className="flex justify-between text-xs text-gray-400 mb-2 uppercase font-bold">
+                                <span>Sell {base}</span>
+                                <span>Bal: $142,050.00</span>
+                            </div>
+                            <div className="flex gap-2">
+                                <select 
+                                    value={base} 
+                                    onChange={e => setBase(e.target.value)}
+                                    className="bg-white/10 border-none rounded-lg text-white font-bold focus:ring-0 cursor-pointer"
+                                >
+                                    {CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.flag} {c.code}</option>)}
+                                </select>
+                                <input 
+                                    type="number" 
+                                    value={amount} 
+                                    onChange={e => setAmount(e.target.value)} 
+                                    className="w-full bg-transparent text-right text-2xl font-mono font-bold text-white focus:outline-none"
+                                />
+                            </div>
+                        </div>
 
-                <div className="bg-black/30 p-4 rounded-xl border border-white/5">
-                    <div className="flex justify-between text-xs text-gray-400 mb-2 uppercase font-bold">
-                        <span>Buy {quote}</span>
-                        <span>Indicative</span>
+                        <div className="bg-black/30 p-4 rounded-xl border border-white/5">
+                            <div className="flex justify-between text-xs text-gray-400 mb-2 uppercase font-bold">
+                                <span>Buy {quote}</span>
+                                <span>Indicative</span>
+                            </div>
+                            <div className="flex gap-2 items-center justify-between h-full">
+                                <select 
+                                    value={quote} 
+                                    onChange={e => setQuote(e.target.value)}
+                                    className="bg-white/10 border-none rounded-lg text-white font-bold focus:ring-0 cursor-pointer"
+                                >
+                                     {CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.flag} {c.code}</option>)}
+                                </select>
+                                <span className="text-2xl font-mono font-bold text-yellow-400">
+                                    {new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(converted)}
+                                </span>
+                            </div>
+                        </div>
                     </div>
-                    <div className="flex gap-2 items-center justify-between h-full">
-                        <select 
-                            value={quote} 
-                            onChange={e => setQuote(e.target.value)}
-                            className="bg-white/10 border-none rounded-lg text-white font-bold focus:ring-0 cursor-pointer"
-                        >
-                             {CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.flag} {c.code}</option>)}
-                        </select>
-                        <span className="text-2xl font-mono font-bold text-yellow-400">
-                            {new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(converted)}
-                        </span>
-                    </div>
-                </div>
-            </div>
 
-            {/* Live Rate Display */}
-            <div className="flex items-center justify-between bg-white/5 p-4 rounded-xl border border-white/10 mb-6">
-                <div>
-                    <p className="text-xs text-gray-500 uppercase tracking-wider font-bold">Spot Rate ({base}/{quote})</p>
-                    <div className={`text-3xl font-mono font-bold transition-colors duration-300 ${flash === 'up' ? 'text-green-400' : flash === 'down' ? 'text-red-400' : 'text-white'}`}>
-                        {rate.toFixed(5)}
-                        <span className="text-lg ml-2 opacity-50">
-                            {flash === 'up' ? <i className="fas fa-caret-up"></i> : flash === 'down' ? <i className="fas fa-caret-down"></i> : null}
-                        </span>
+                    {/* Live Rate Display */}
+                    <div className="flex items-center justify-between bg-white/5 p-4 rounded-xl border border-white/10 mb-6">
+                        <div>
+                            <p className="text-xs text-gray-500 uppercase tracking-wider font-bold">Spot Rate ({base}/{quote})</p>
+                            <div className={`text-3xl font-mono font-bold transition-colors duration-300 ${flash === 'up' ? 'text-green-400' : flash === 'down' ? 'text-red-400' : 'text-white'}`}>
+                                {rate.toFixed(5)}
+                                <span className="text-lg ml-2 opacity-50">
+                                    {flash === 'up' ? <i className="fas fa-caret-up"></i> : flash === 'down' ? <i className="fas fa-caret-down"></i> : null}
+                                </span>
+                            </div>
+                        </div>
+                        
+                        <div className="flex items-end gap-1 h-12">
+                            {trend.map((val, i) => (
+                                <div 
+                                    key={i} 
+                                    className={`w-2 rounded-t ${val >= trend[i-1] ? 'bg-green-500/50' : 'bg-red-500/50'}`} 
+                                    style={{ height: `${((val - (rate * 0.999)) / (rate * 0.002)) * 100}%` }}
+                                ></div>
+                            ))}
+                        </div>
                     </div>
-                </div>
-                
-                {/* Mini Sparkline visualization (CSS based for simplicity in simulation) */}
-                <div className="flex items-end gap-1 h-12">
-                    {trend.map((val, i) => (
-                        <div 
-                            key={i} 
-                            className={`w-2 rounded-t ${val >= trend[i-1] ? 'bg-green-500/50' : 'bg-red-500/50'}`} 
-                            style={{ height: `${((val - (rate * 0.999)) / (rate * 0.002)) * 100}%` }}
-                        ></div>
-                    ))}
-                </div>
-            </div>
 
-            <button className="w-full py-4 rounded-xl bg-[#e6b325] hover:bg-[#d4a017] text-[#1a365d] font-bold text-lg shadow-lg shadow-yellow-500/20 transition-all transform hover:-translate-y-0.5 active:scale-95 flex items-center justify-center gap-2">
-                <i className="fas fa-bolt"></i> Execute Trade
-            </button>
-             <p className="text-center text-[10px] text-gray-500 mt-3">Quotes update every 2.5s. Final execution rate may vary.</p>
+                    <button 
+                        onClick={handleTrade}
+                        disabled={tradeStatus !== 'idle'}
+                        className="w-full py-4 rounded-xl bg-[#e6b325] hover:bg-[#d4a017] text-[#1a365d] font-bold text-lg shadow-lg shadow-yellow-500/20 transition-all transform hover:-translate-y-0.5 active:scale-95 flex items-center justify-center gap-2"
+                    >
+                        {tradeStatus === 'executing' ? <i className="fas fa-circle-notch fa-spin"></i> : <i className="fas fa-bolt"></i>}
+                        {tradeStatus === 'executing' ? 'Executing...' : 'Execute Trade'}
+                    </button>
+                     <p className="text-center text-[10px] text-gray-500 mt-3">Quotes update every 2.5s. Final execution rate may vary.</p>
+                 </>
+            )}
         </div>
     );
 };

@@ -72,6 +72,14 @@ const PaymentLimitsWidget: React.FC = () => (
 const PaymentsView: React.FC<PaymentsViewProps> = ({ setActiveView }) => {
     const [activeTab, setActiveTab] = useState<'send' | 'wire' | 'recurring' | 'bills'>('send');
 
+    const handleDownloadStatements = () => {
+        alert("Downloading latest consolidated statement PDF...");
+    };
+
+    const handleOpenSettings = () => {
+        setActiveView('settings');
+    };
+
     const renderContent = () => {
         switch (activeTab) {
             case 'send': return <SendMoney setActiveView={setActiveView} />;
@@ -136,11 +144,11 @@ const PaymentsView: React.FC<PaymentsViewProps> = ({ setActiveView }) => {
                         <p className="text-gray-400 mt-2 text-lg">Global liquidity management and transfer execution.</p>
                     </div>
                     <div className="flex gap-3 mt-4 md:mt-0">
-                         <button className="px-4 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-sm font-medium transition-colors">
-                            <i className="fas fa-download mr-2"></i> Statements
+                         <button onClick={handleDownloadStatements} className="px-4 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-sm font-medium transition-colors flex items-center gap-2">
+                            <i className="fas fa-download"></i> Statements
                         </button>
-                        <button className="px-4 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-sm font-medium transition-colors">
-                            <i className="fas fa-cog mr-2"></i> Settings
+                        <button onClick={handleOpenSettings} className="px-4 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-sm font-medium transition-colors flex items-center gap-2">
+                            <i className="fas fa-cog"></i> Settings
                         </button>
                     </div>
                 </div>
