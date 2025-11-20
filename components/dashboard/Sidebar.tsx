@@ -50,6 +50,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView }) => {
         { view: 'investments', label: 'Investments', icon: 'fa-chart-line' },
         { view: 'crypto', label: 'Crypto', icon: 'fa-btc' },
         { view: 'loans', label: 'Loans', icon: 'fa-landmark' },
+        { view: 'recurring-payments', label: 'Recurring', icon: 'fa-calendar-check' },
     ];
     
     const toolsViews: { view: ViewType; label: string; icon: string }[] = [

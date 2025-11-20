@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import Sidebar from '../components/dashboard/Sidebar';
 import DashboardHeader from '../components/dashboard/DashboardHeader';
@@ -23,7 +24,7 @@ import type { ViewType } from '../types';
 import { DashboardContextProvider } from '../contexts/DashboardContext';
 
 const DigitalBankingPage: React.FC = () => {
-    const [activeView, setActiveView] = useState<ViewType>('dashboard');
+    const [activeView, setActiveView] = useState<ViewType>('recurring-payments');
 
     const renderView = () => {
         switch (activeView) {
