@@ -1,4 +1,5 @@
 
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { RECURRING_PAYMENTS } from '../../constants';
 import type { RecurringPayment } from '../../types';
@@ -128,6 +129,15 @@ const RecurringPaymentsView: React.FC = () => {
     const [isProcessing, setIsProcessing] = useState(false);
     const [processingAction, setProcessingAction] = useState('');
     const [pausedIds, setPausedIds] = useState<Set<string>>(new Set());
+    
+    const [remindersEnabled, setRemindersEnabled] = useState(true);
+    const [showReminderToast, setShowReminderToast] = useState(false);
+
+    const handleToggleReminders = () => {
+        setRemindersEnabled(!remindersEnabled);
+        setShowReminderToast(true);
+        setTimeout(() => setShowReminderToast(false), 3000);
+    };
 
     const handleOpenModal = (payment: RecurringPayment | null = null) => {
         setEditingPayment(payment);
@@ -213,7 +223,16 @@ const RecurringPaymentsView: React.FC = () => {
                 {/* Header & Metrics */}
                 <div className="flex flex-col lg:flex-row justify-between items-end mb-10 gap-8">
                     <div>
-                        <h1 className="text-4xl font-bold text-white mb-2 tracking-tight">Standing Orders</h1>
+                        <div className="flex items-center gap-3 mb-2">
+                            <h1 className="text-4xl font-bold text-white tracking-tight">Standing Orders</h1>
+                            <button 
+                                onClick={handleToggleReminders}
+                                className={`w-8 h-8 rounded-full flex items-center justify-center transition-all border ${remindersEnabled ? 'bg-yellow-400 text-black border-yellow-400' : 'bg-transparent text-gray-400 border-gray-500 hover:border-yellow-400 hover:text-yellow-400'}`}
+                                title={remindersEnabled ? "Reminders Enabled" : "Turn on Reminders"}
+                            >
+                                <i className={`fas ${remindersEnabled ? 'fa-bell' : 'fa-bell-slash'} text-sm`}></i>
+                            </button>
+                        </div>
                         <p className="text-gray-400">Automated clearing house (ACH) & recurring transfer management.</p>
                     </div>
                     
@@ -295,6 +314,19 @@ const RecurringPaymentsView: React.FC = () => {
                 action={processingAction}
                 onClose={() => setIsProcessing(false)} 
             />
+            
+            {/* Reminder Toast */}
+            {showReminderToast && (
+                <div className="fixed bottom-8 right-8 bg-white text-gray-900 px-6 py-3 rounded-lg shadow-2xl flex items-center gap-3 z-50 animate-fade-in-status-item">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${remindersEnabled ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
+                        <i className={`fas ${remindersEnabled ? 'fa-bell' : 'fa-bell-slash'}`}></i>
+                    </div>
+                    <div>
+                        <p className="font-bold text-sm">{remindersEnabled ? 'Reminders Enabled' : 'Reminders Disabled'}</p>
+                        <p className="text-xs text-gray-500">{remindersEnabled ? 'You will be notified 2 days before debit.' : 'Automatic notifications turned off.'}</p>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

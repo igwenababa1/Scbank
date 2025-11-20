@@ -4,6 +4,7 @@ import { ACCOUNTS, CURRENCY_RATES } from '../../../constants';
 import type { ViewType } from '../../../types';
 import { useDashboard } from '../../../contexts/DashboardContext';
 import { formatCurrency } from '../../../utils/formatters';
+import { CURRENCIES } from '../../../i18n';
 
 interface WireTransferProps {
     setActiveView: (view: ViewType) => void;
@@ -24,7 +25,8 @@ const WireTransfer: React.FC<WireTransferProps> = ({ setActiveView }) => {
         memo: '',
     });
     const [isConfirming, setIsConfirming] = useState(false);
-    const [toCurrency, setToCurrency] = useState(CURRENCY_RATES[0].code);
+    // Ensure valid default currency
+    const [toCurrency, setToCurrency] = useState(CURRENCY_RATES.length > 0 ? CURRENCY_RATES[0].code : 'EUR');
     
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
@@ -37,9 +39,10 @@ const WireTransfer: React.FC<WireTransferProps> = ({ setActiveView }) => {
     const amountNum = parseFloat(formData.amount) || 0;
     const fromAccountDetails = ACCOUNTS.find(a => a.id === formData.fromAccount);
 
+    // Calculate exchange details
     const { exchangeRate, convertedAmount } = useMemo(() => {
         if (wireType !== 'international' || amountNum <= 0) {
-            return { exchangeRate: null, convertedAmount: 0 };
+            return { exchangeRate: 0, convertedAmount: 0 };
         }
         const rate = CURRENCY_RATES.find(r => r.code === toCurrency)?.rate || 0;
         return {
@@ -48,14 +51,26 @@ const WireTransfer: React.FC<WireTransferProps> = ({ setActiveView }) => {
         };
     }, [amountNum, toCurrency, wireType]);
 
+    // Fees Calculation
+    const fixedFee = 25.00;
+    const intermediaryFee = wireType === 'international' ? 18.00 : 0;
+    const marginRate = 0.0075; // 0.75%
+    const exchangeMargin = wireType === 'international' ? amountNum * marginRate : 0;
+    const totalDebit = amountNum + fixedFee + intermediaryFee;
+
     const handleConfirm = () => {
         const newReceipt = {
             vendor: `Wire to ${formData.recipientName}`,
             vendorLogo: 'https://img.icons8.com/ios-filled/50/000000/bank.png',
             date: new Date().toISOString(),
-            total: parseFloat(formData.amount),
+            total: totalDebit,
             category: 'Wire Transfer',
-            items: [{ name: `Memo: "${formData.memo || 'N/A'}"`, quantity: 1, price: parseFloat(formData.amount) }],
+            items: [
+                { name: `Principal Amount`, quantity: 1, price: amountNum },
+                { name: `Network Fee`, quantity: 1, price: fixedFee },
+                ...(intermediaryFee > 0 ? [{ name: `Intermediary Bank Fee`, quantity: 1, price: intermediaryFee }] : []),
+                { name: `Memo: "${formData.memo || 'N/A'}"`, quantity: 1, price: 0 }
+            ],
         };
         addReceiptAndNavigate(newReceipt, setActiveView);
     };
@@ -82,16 +97,65 @@ const WireTransfer: React.FC<WireTransferProps> = ({ setActiveView }) => {
                     
                     <div className="space-y-6">
                         <div className="flex justify-between items-center">
-                            <span className="text-gray-400">Total Amount</span>
-                            <span className="text-3xl font-bold text-white">{formatCurrency(amountNum)}</span>
+                            <span className="text-gray-400">Principal Amount</span>
+                            <span className="text-2xl font-bold text-white">{formatCurrency(amountNum)}</span>
                         </div>
 
-                        {wireType === 'international' && exchangeRate && (
+                        {wireType === 'international' && exchangeRate > 0 && (
                              <div className="bg-blue-500/20 border border-blue-500/30 p-4 rounded-xl flex justify-between items-center">
                                  <span className="text-blue-200 text-sm">Recipient Receives (Est.)</span>
                                  <span className="font-bold text-lg text-blue-100">{new Intl.NumberFormat('en-US', { style: 'currency', currency: toCurrency }).format(convertedAmount)}</span>
                              </div>
                         )}
+                        
+                        {/* Fee Breakdown Visualization */}
+                        <div className="bg-white/5 rounded-xl p-5 border border-white/10 mt-4">
+                            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                                <i className="fas fa-chart-pie"></i> Transfer Cost Breakdown
+                            </h4>
+                            
+                            {/* Visual Bar */}
+                            <div className="flex h-3 rounded-full overflow-hidden mb-5 bg-gray-800">
+                                <div className="bg-blue-500 h-full transition-all duration-1000" style={{ width: '80%' }} title="Principal"></div>
+                                <div className="bg-yellow-500 h-full transition-all duration-1000" style={{ width: '10%' }} title="Fees"></div>
+                                {wireType === 'international' && <div className="bg-purple-500 h-full transition-all duration-1000" style={{ width: '10%' }} title="FX Margin"></div>}
+                            </div>
+
+                            <div className="space-y-3 text-sm">
+                                <div className="flex justify-between items-center">
+                                    <span className="flex items-center gap-2 text-gray-300 text-xs">
+                                        <div className="w-2 h-2 rounded-full bg-blue-500"></div> Principal
+                                    </span>
+                                    <span className="font-mono text-white">{formatCurrency(amountNum)}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="flex items-center gap-2 text-gray-300 text-xs">
+                                        <div className="w-2 h-2 rounded-full bg-yellow-500"></div> Network Fee
+                                    </span>
+                                    <span className="font-mono text-white">{formatCurrency(fixedFee)}</span>
+                                </div>
+                                {wireType === 'international' && (
+                                    <>
+                                        <div className="flex justify-between items-center">
+                                             <span className="flex items-center gap-2 text-gray-300 text-xs">
+                                                <div className="w-2 h-2 rounded-full bg-yellow-600"></div> Intermediary (Est.)
+                                            </span>
+                                            <span className="font-mono text-white">{formatCurrency(intermediaryFee)}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                            <span className="flex items-center gap-2 text-gray-300 text-xs" title="Embedded in exchange rate">
+                                                <div className="w-2 h-2 rounded-full bg-purple-500"></div> Exchange Margin ({ (marginRate * 100).toFixed(2) }%)
+                                            </span>
+                                             <span className="font-mono text-white/70 italic">{formatCurrency(exchangeMargin)}</span>
+                                        </div>
+                                    </>
+                                )}
+                                <div className="border-t border-white/10 pt-3 flex justify-between items-center mt-2">
+                                    <span className="font-bold text-white uppercase text-xs tracking-wider">Total Debit</span>
+                                    <span className="font-bold text-xl text-white">{formatCurrency(totalDebit)}</span>
+                                </div>
+                            </div>
+                        </div>
 
                         <div className="grid grid-cols-2 gap-y-4 text-sm border-t border-white/10 pt-4">
                              <div><p className="text-gray-500">From Account</p><p className="font-semibold text-white">{fromAccountDetails?.type} (••• {fromAccountDetails?.number.slice(-4)})</p></div>
@@ -148,14 +212,18 @@ const WireTransfer: React.FC<WireTransferProps> = ({ setActiveView }) => {
                      
                      {wireType === 'international' && (
                          <div>
-                             <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Currency</label>
-                             <select name="toCurrency" value={toCurrency} onChange={handleCurrencyChange} className="w-full bg-[#0b1120] border border-white/20 rounded-lg px-4 py-3 text-white focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400 cursor-pointer">
-                                 {CURRENCY_RATES.map(rate => <option key={rate.code} value={rate.code}>{rate.code}</option>)}
+                             <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Target Currency</label>
+                             <select 
+                                value={toCurrency} 
+                                onChange={handleCurrencyChange} 
+                                className="w-full bg-[#0b1120] border border-white/20 rounded-lg px-4 py-3 text-white focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400 cursor-pointer appearance-none"
+                            >
+                                 {CURRENCIES.map(rate => <option key={rate.code} value={rate.code}>{rate.code} - {rate.code === 'EUR' ? 'Euro' : rate.code === 'GBP' ? 'British Pound' : 'Yen'}</option>)}
                              </select>
                          </div>
                      )}
                 </div>
-                 {wireType === 'international' && exchangeRate && amountNum > 0 && (
+                 {wireType === 'international' && exchangeRate > 0 && amountNum > 0 && (
                      <div className="mt-4 flex items-center justify-between text-sm text-gray-400 border-t border-white/10 pt-3">
                         <span>Exchange Rate: 1 USD ≈ {exchangeRate.toFixed(4)} {toCurrency}</span>
                         <span className="text-yellow-400 font-bold">Est. Total: {new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(convertedAmount)} {toCurrency}</span>

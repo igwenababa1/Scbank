@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { formatCurrency, formatDate } from '../../../utils/formatters';
 import { ACCOUNTS } from '../../../constants';
@@ -38,6 +39,103 @@ const BillStatusBadge: React.FC<{ status: Bill['status'] }> = ({ status }) => {
         <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${styles[status]}`}>
             {status}
         </span>
+    );
+};
+
+const EBillViewerModal: React.FC<{ isOpen: boolean; onClose: () => void; bill: Bill; onPay: (bill: Bill) => void }> = ({ isOpen, onClose, bill, onPay }) => {
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        if (isOpen) {
+            setLoading(true);
+            // Simulate fetching secure document
+            const timer = setTimeout(() => setLoading(false), 2000);
+            return () => clearTimeout(timer);
+        }
+    }, [isOpen]);
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[60] flex items-center justify-center p-4" onClick={onClose}>
+            <div className="bg-gray-900 border border-white/10 rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+                <div className="flex justify-between items-center p-6 border-b border-white/10 bg-white/5">
+                    <h3 className="text-xl font-bold text-white flex items-center gap-3">
+                        <i className="fas fa-file-invoice text-blue-400"></i>
+                        eBill Statement
+                    </h3>
+                    <button onClick={onClose} className="text-gray-400 hover:text-white"><i className="fas fa-times"></i></button>
+                </div>
+
+                <div className="p-8 flex-grow overflow-y-auto flex flex-col">
+                    {loading ? (
+                         <div className="flex-grow flex flex-col items-center justify-center text-center py-12">
+                            <div className="w-16 h-16 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin mb-6"></div>
+                            <p className="text-white font-semibold text-lg">Retrieving secure document...</p>
+                            <p className="text-sm text-gray-500 mt-2">Connecting to {bill.billerName} secure portal via encrypted channel.</p>
+                        </div>
+                    ) : (
+                        <>
+                            <div className="flex justify-between items-start mb-8">
+                                <div>
+                                    <h2 className="text-3xl font-bold text-white">{bill.billerName}</h2>
+                                    <p className="text-gray-400">Account: {bill.accountNumber}</p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-sm text-gray-400 uppercase tracking-wider">Amount Due</p>
+                                    <p className="text-3xl font-bold text-white">{formatCurrency(bill.amount)}</p>
+                                    <p className="text-sm text-red-400 font-semibold mt-1">Due {new Date(bill.dueDate).toLocaleDateString()}</p>
+                                </div>
+                            </div>
+
+                            {/* Mock PDF Preview */}
+                            <div className="flex-grow bg-white text-gray-800 p-8 rounded-lg shadow-inner mb-8 font-mono text-sm relative overflow-hidden min-h-[300px]">
+                                <div className="absolute top-0 right-0 bg-gray-200 px-2 py-1 text-[10px] font-bold rounded-bl">PREVIEW</div>
+                                <div className="border-b-2 border-gray-800 pb-4 mb-6 flex justify-between items-end">
+                                    <div>
+                                        <span className="text-xl font-bold block">{bill.billerName.toUpperCase()}</span>
+                                        <span className="text-xs text-gray-500">123 Corporate Drive, Suite 400</span>
+                                    </div>
+                                    <div className="text-right">
+                                        <span className="block font-bold">INVOICE</span>
+                                        <span className="text-xs">#{Math.floor(Math.random()*1000000)}</span>
+                                    </div>
+                                </div>
+                                <div className="space-y-3 mb-6">
+                                    <div className="flex justify-between"><span>Billing Period</span><span>{new Date(Date.now() - 30 * 86400000).toLocaleDateString()} - {new Date().toLocaleDateString()}</span></div>
+                                    <div className="flex justify-between"><span>Previous Balance</span><span>$0.00</span></div>
+                                    <div className="flex justify-between"><span>New Charges ({bill.category})</span><span>{formatCurrency(bill.amount * 0.88)}</span></div>
+                                    <div className="flex justify-between"><span>Taxes & Fees</span><span>{formatCurrency(bill.amount * 0.12)}</span></div>
+                                    <div className="border-t border-gray-400 my-2"></div>
+                                    <div className="flex justify-between font-bold text-lg"><span>Total Due</span><span>{formatCurrency(bill.amount)}</span></div>
+                                </div>
+                                <div className="bg-gray-100 p-4 rounded text-xs text-gray-600 leading-relaxed">
+                                    <p className="font-bold mb-1">Important Information:</p>
+                                    <p>Late payments may be subject to a fee. Please ensure your payment reaches us by the due date to avoid service interruption.</p>
+                                </div>
+                                <div className="mt-8 text-center text-[10px] text-gray-400 uppercase">
+                                    Thank you for being a valued customer.
+                                </div>
+                            </div>
+
+                            <div className="flex gap-4 mt-auto">
+                                <button className="flex-1 py-3 rounded-xl border border-white/10 hover:bg-white/5 text-white font-semibold transition-colors flex items-center justify-center gap-2 group">
+                                    <i className="fas fa-download group-hover:translate-y-0.5 transition-transform"></i> Download PDF
+                                </button>
+                                {bill.status !== 'Paid' && (
+                                    <button 
+                                        onClick={() => { onClose(); onPay(bill); }}
+                                        className="flex-1 py-3 rounded-xl bg-yellow-400 text-[#1a365d] font-bold hover:bg-yellow-300 transition-colors shadow-lg hover:shadow-yellow-400/20"
+                                    >
+                                        Pay Now
+                                    </button>
+                                )}
+                            </div>
+                        </>
+                    )}
+                </div>
+            </div>
+        </div>
     );
 };
 
@@ -136,6 +234,10 @@ const BillPayCenter: React.FC = () => {
     const [bills, setBills] = useState<Bill[]>(MOCK_BILLS);
     const [selectedAccount, setSelectedAccount] = useState<Account>(ACCOUNTS[0]);
     const [processingBill, setProcessingBill] = useState<Bill | null>(null);
+    const [viewingEBill, setViewingEBill] = useState<Bill | null>(null);
+    
+    const [remindersEnabled, setRemindersEnabled] = useState(true);
+    const [notificationState, setNotificationState] = useState<{ show: boolean, message: string, icon: string, color: string } | null>(null);
 
     const totalDue = bills.reduce((sum, b) => b.status !== 'Paid' && b.status !== 'Scheduled' ? sum + b.amount : sum, 0);
     const scheduledTotal = bills.reduce((sum, b) => b.status === 'Scheduled' ? sum + b.amount : sum, 0);
@@ -151,17 +253,66 @@ const BillPayCenter: React.FC = () => {
             setProcessingBill(null);
         }
     };
+    
+    const showNotification = (message: string, icon: string, color: string) => {
+        setNotificationState({ show: true, message, icon, color });
+        setTimeout(() => setNotificationState(null), 3000);
+    };
 
     const toggleAutoPay = (id: string) => {
-        setBills(prev => prev.map(b => b.id === id ? { ...b, autoPay: !b.autoPay } : b));
+        setBills(prev => prev.map(b => {
+            if (b.id === id) {
+                const newAutoPay = !b.autoPay;
+                let newStatus = b.status;
+                
+                // Smart Status Update logic
+                if (newAutoPay) {
+                    if (b.status !== 'Paid') newStatus = 'Scheduled';
+                    showNotification(`Auto-Pay enabled for ${b.billerName}`, 'fa-check-circle', 'text-green-500');
+                } else {
+                    if (b.status === 'Scheduled') {
+                        // Revert status based on dates if it was scheduled
+                        const now = new Date();
+                        const due = new Date(b.dueDate);
+                        const diffTime = due.getTime() - now.getTime();
+                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                        
+                        if (diffDays < 0) newStatus = 'Overdue';
+                        else if (diffDays <= 3) newStatus = 'Due Soon';
+                        else newStatus = 'Unpaid';
+                    }
+                    showNotification(`Auto-Pay disabled for ${b.billerName}`, 'fa-info-circle', 'text-blue-400');
+                }
+                
+                return { ...b, autoPay: newAutoPay, status: newStatus };
+            }
+            return b;
+        }));
+    };
+    
+    const toggleReminders = () => {
+        setRemindersEnabled(!remindersEnabled);
+        const msg = !remindersEnabled ? 'Bill Due Alerts Enabled' : 'Bill Alerts Muted';
+        const icon = !remindersEnabled ? 'fa-bell' : 'fa-bell-slash';
+        const color = !remindersEnabled ? 'text-yellow-400' : 'text-gray-400';
+        showNotification(msg, icon, color);
     };
 
     return (
-        <div className="animate-fade-in-scale-up">
+        <div className="animate-fade-in-scale-up relative">
             {/* Dashboard Metrics */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-                <div className="bg-gradient-to-br from-red-900/40 to-red-800/10 border border-red-500/20 p-5 rounded-xl">
-                    <p className="text-red-300 text-xs font-bold uppercase tracking-wider mb-1">Total Due Now</p>
+                <div className="bg-gradient-to-br from-red-900/40 to-red-800/10 border border-red-500/20 p-5 rounded-xl relative">
+                    <div className="flex justify-between items-start">
+                        <p className="text-red-300 text-xs font-bold uppercase tracking-wider mb-1">Total Due Now</p>
+                        <button 
+                            onClick={toggleReminders} 
+                            className={`text-xs flex items-center gap-1 ${remindersEnabled ? 'text-yellow-400' : 'text-gray-500 hover:text-gray-300'}`}
+                            title="Toggle Due Date Alerts"
+                        >
+                            <i className={`fas ${remindersEnabled ? 'fa-bell' : 'fa-bell-slash'}`}></i>
+                        </button>
+                    </div>
                     <p className="text-3xl font-bold text-white">{formatCurrency(totalDue)}</p>
                     <div className="w-full bg-red-900/30 h-1 mt-3 rounded-full overflow-hidden">
                         <div className="bg-red-500 h-full w-3/4"></div>
@@ -233,9 +384,17 @@ const BillPayCenter: React.FC = () => {
                                         <div>
                                             <div className="flex items-center gap-2">
                                                 <h4 className="font-bold text-white">{bill.billerName}</h4>
-                                                {bill.isEBill && <i className="fas fa-file-invoice text-green-400 text-xs" title="eBill Available"></i>}
+                                                {bill.isEBill && (
+                                                    <button 
+                                                        onClick={(e) => { e.stopPropagation(); setViewingEBill(bill); }}
+                                                        className="flex items-center gap-1 text-[10px] bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded hover:bg-blue-500/40 transition-colors border border-blue-500/30"
+                                                        title="View Electronic Bill"
+                                                    >
+                                                        <i className="fas fa-file-invoice"></i> eBill
+                                                    </button>
+                                                )}
                                             </div>
-                                            <p className="text-xs text-gray-400 flex items-center gap-2">
+                                            <p className="text-xs text-gray-400 flex items-center gap-2 mt-0.5">
                                                 {bill.category} &bull; Due {formatDate(bill.dueDate)}
                                             </p>
                                         </div>
@@ -328,6 +487,27 @@ const BillPayCenter: React.FC = () => {
                     bill={processingBill}
                     account={selectedAccount}
                 />
+            )}
+            
+            {viewingEBill && (
+                <EBillViewerModal 
+                    isOpen={!!viewingEBill}
+                    onClose={() => setViewingEBill(null)}
+                    bill={viewingEBill}
+                    onPay={handlePayBill}
+                />
+            )}
+            
+            {/* Generic Notification Toast */}
+            {notificationState && (
+                <div className="absolute bottom-8 right-0 left-0 flex justify-center z-50 animate-fade-in-status-item">
+                    <div className="bg-white text-gray-900 px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 border border-gray-100">
+                        <i className={`fas ${notificationState.icon} ${notificationState.color}`}></i>
+                        <span className="font-bold text-sm">
+                            {notificationState.message}
+                        </span>
+                    </div>
+                </div>
             )}
         </div>
     );

@@ -1,4 +1,5 @@
 
+
 import React, { useState, useMemo } from 'react';
 // FIX: Corrected import path
 import { USER_SETTINGS } from '../../constants';
@@ -102,6 +103,7 @@ const SettingsView: React.FC = () => {
         lowBalance: "Low Balance Warning",
         creditScoreChange: "Credit Score Changes",
         paymentDue: "Payment Due Reminders",
+        recurringActivity: "Recurring Payments & Automations"
     };
 
     const handleSaveChanges = () => {

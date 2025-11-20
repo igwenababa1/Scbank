@@ -1,4 +1,5 @@
 
+
 import type {
     Feature,
     Testimonial,
@@ -269,6 +270,7 @@ export const USER_SETTINGS: UserSettings = {
             lowBalance: { email: false, sms: false, push: true },
             creditScoreChange: { email: true, sms: false, push: true },
             paymentDue: { email: true, sms: true, push: true },
+            recurringActivity: { email: true, sms: false, push: true },
         }
     }
 };

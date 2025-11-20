@@ -1,3 +1,4 @@
+
 // FIX: Removed self-import of 'ViewType' that was causing a conflict.
 export type ViewType =
   | 'dashboard'
@@ -187,6 +188,7 @@ export interface UserSettings {
             lowBalance: { email: boolean; sms: boolean; push: boolean; };
             creditScoreChange: { email: boolean; sms: boolean; push: boolean; };
             paymentDue: { email: boolean; sms: boolean; push: boolean; };
+            recurringActivity: { email: boolean; sms: boolean; push: boolean; };
         };
     };
 }
