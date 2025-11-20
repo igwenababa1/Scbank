@@ -1,3 +1,4 @@
+
 // FIX: Removed invalid text from the start and end of the file that was causing parsing errors.
 import React, { useContext, useState } from 'react';
 import { AppContext } from '../../App';
@@ -37,6 +38,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView }) => {
     const [isCollapsed, setIsCollapsed] = useState(false);
 
     const mainViews: { view: ViewType; label: string; icon: string }[] = [
+        { view: 'congratulations', label: 'Net Worth', icon: 'fa-gem' },
         { view: 'dashboard', label: 'Dashboard', icon: 'fa-home' },
         { view: 'transactions', label: 'Transactions', icon: 'fa-exchange-alt' },
         { view: 'cards', label: 'Cards', icon: 'fa-credit-card' },
@@ -44,7 +46,6 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView }) => {
     ];
     
     const financialViews: { view: ViewType; label: string; icon: string }[] = [
-        { view: 'congratulations', label: 'Net Worth', icon: 'fa-gem' },
         { view: 'budgeting', label: 'Budgeting', icon: 'fa-chart-pie' },
         { view: 'investments', label: 'Investments', icon: 'fa-chart-line' },
         { view: 'crypto', label: 'Crypto', icon: 'fa-btc' },

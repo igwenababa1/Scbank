@@ -11,12 +11,13 @@ const QuickActionButton: React.FC<QuickActionButtonProps> = ({ icon, label, onCl
     return (
         <button
             onClick={onClick}
-            className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-md text-center hover:bg-gray-50 dark:hover:bg-slate-700 hover:-translate-y-1 transition-all duration-200"
+            className="group relative flex flex-col items-center justify-center p-4 rounded-2xl transition-all duration-300 hover:-translate-y-1"
         >
-            <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 text-xl rounded-full flex items-center justify-center mx-auto mb-2">
-                <i className={`fas ${icon}`}></i>
+            <div className="absolute inset-0 bg-white/80 dark:bg-slate-800/60 backdrop-blur-md rounded-2xl shadow-lg border border-white/20 dark:border-white/10 transition-all duration-300 group-hover:shadow-xl group-hover:bg-white/90 dark:group-hover:bg-slate-800/80"></div>
+            <div className="relative z-10 w-12 h-12 rounded-full bg-gradient-to-br from-[#1a365d] to-[#2d5c8a] flex items-center justify-center shadow-inner mb-3 group-hover:scale-110 transition-transform duration-300">
+                <i className={`fas ${icon} text-yellow-400 text-xl`}></i>
             </div>
-            <p className="font-semibold text-gray-700 dark:text-slate-200 text-sm">{label}</p>
+            <span className="relative z-10 font-semibold text-gray-700 dark:text-gray-200 text-sm group-hover:text-[#1a365d] dark:group-hover:text-white transition-colors">{label}</span>
         </button>
     );
 };

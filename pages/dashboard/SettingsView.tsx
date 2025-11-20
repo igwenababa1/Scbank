@@ -136,18 +136,27 @@ const SettingsView: React.FC = () => {
                             <div className="bg-gray-900/50 p-6 rounded-lg">
                                 <h4 className="font-bold mb-4">Core Security</h4>
                                 <div className="flex items-center justify-between py-3 border-b border-white/10">
-                                    <div><p className="font-semibold">Two-Factor Authentication</p></div>
+                                    <div>
+                                        <p className="font-semibold">Two-Factor Authentication</p>
+                                        <p className="text-xs text-gray-400 mt-0.5">Require a verification code when logging in</p>
+                                    </div>
                                     <ToggleSwitch checked={draftSettings.security.twoFactorAuth} onChange={() => handleSecurityToggle('twoFactorAuth')} />
                                 </div>
                                 <div className="flex items-center justify-between py-3">
-                                    <div><p className="font-semibold">Biometric Login</p></div>
+                                    <div>
+                                        <p className="font-semibold">Biometric Login</p>
+                                        <p className="text-xs text-gray-400 mt-0.5">Use FaceID or TouchID for faster access</p>
+                                    </div>
                                     <ToggleSwitch checked={draftSettings.security.biometricLogin} onChange={() => handleSecurityToggle('biometricLogin')} />
                                 </div>
                             </div>
                              <div className="bg-gray-900/50 p-6 rounded-lg">
                                 <h4 className="font-bold mb-4">Password</h4>
                                 <div className="flex items-center justify-between">
-                                    <p className="text-gray-400 text-sm">Last changed 3 months ago</p>
+                                    <div>
+                                        <p className="text-gray-400 text-sm">Last changed 3 months ago</p>
+                                        <p className="text-xs text-gray-500 mt-0.5">Strong password enabled</p>
+                                    </div>
                                     <button onClick={() => setIsPasswordModalOpen(true)} className="px-4 py-2 text-sm font-semibold rounded-md bg-yellow-500/20 text-yellow-300 hover:bg-yellow-500/40">Change Password</button>
                                 </div>
                             </div>

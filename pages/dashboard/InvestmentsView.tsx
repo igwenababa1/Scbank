@@ -1,5 +1,5 @@
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { Chart, registerables } from 'chart.js';
 // FIX: Corrected import path
 import { PORTFOLIO_SUMMARY, HOLDINGS, ASSET_ALLOCATION, MARKET_MOVERS, WATCHLIST } from '../../constants';
@@ -95,12 +95,15 @@ const MarketWatch: React.FC = () => {
     );
 };
 
+type SortKey = 'symbol' | 'marketValue' | 'price' | 'change';
 
 const InvestmentsView: React.FC = () => {
     const [isTradeModalOpen, setIsTradeModalOpen] = useState(false);
     const [tradeDetails, setTradeDetails] = useState<{ holding: Holding | null, type: 'Buy' | 'Sell' }>({ holding: null, type: 'Buy' });
     const [selectedHolding, setSelectedHolding] = useState<Holding | null>(null);
     const [timeRange, setTimeRange] = useState('1Y');
+    const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'asc' | 'desc' } | null>(null);
+    
     const portfolioChartRef = useRef<HTMLCanvasElement>(null);
     const chartInstanceRef = useRef<Chart | null>(null);
 
@@ -126,6 +129,54 @@ const InvestmentsView: React.FC = () => {
     const handleSellFromDetail = (holding: Holding) => {
         setSelectedHolding(null);
         handleOpenTradeModal(holding, 'Sell');
+    };
+
+    const requestSort = (key: SortKey) => {
+        let direction: 'asc' | 'desc' = 'asc';
+        if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+            direction = 'desc';
+        }
+        setSortConfig({ key, direction });
+    };
+
+    const sortedHoldings = useMemo(() => {
+        let sortableItems = [...HOLDINGS];
+        if (sortConfig !== null) {
+            sortableItems.sort((a, b) => {
+                let aValue: any;
+                let bValue: any;
+
+                switch (sortConfig.key) {
+                    case 'marketValue':
+                        aValue = a.shares * a.price;
+                        bValue = b.shares * b.price;
+                        break;
+                    case 'symbol':
+                        aValue = a.symbol;
+                        bValue = b.symbol;
+                        break;
+                    default:
+                        aValue = a[sortConfig.key as keyof Holding];
+                        bValue = b[sortConfig.key as keyof Holding];
+                }
+
+                if (aValue < bValue) {
+                    return sortConfig.direction === 'asc' ? -1 : 1;
+                }
+                if (aValue > bValue) {
+                    return sortConfig.direction === 'asc' ? 1 : -1;
+                }
+                return 0;
+            });
+        }
+        return sortableItems;
+    }, [sortConfig]);
+
+    const SortIndicator: React.FC<{ currentSort: typeof sortConfig, sortKey: SortKey }> = ({ currentSort, sortKey }) => {
+        if (currentSort?.key !== sortKey) return <i className="fas fa-sort text-gray-600 ml-1 text-xs"></i>;
+        return currentSort.direction === 'asc' 
+            ? <i className="fas fa-sort-up text-yellow-400 ml-1 text-xs align-bottom"></i>
+            : <i className="fas fa-sort-down text-yellow-400 ml-1 text-xs align-top"></i>;
     };
 
     const chartData = {
@@ -216,17 +267,37 @@ const InvestmentsView: React.FC = () => {
                             <h2 className="text-xl font-bold p-6">Your Holdings</h2>
                             <div className="overflow-x-auto">
                                 <table className="w-full text-left">
-                                    <thead className="border-b border-white/10">
+                                    <thead className="border-b border-white/10 bg-gray-900/30 text-xs uppercase text-gray-400">
                                         <tr>
-                                            <th className="p-4 pl-6">Asset</th>
-                                            <th className="p-4 text-right">Market Value</th>
-                                            <th className="p-4 text-right">Price</th>
-                                            <th className="p-4 text-right pr-6">Day's Change</th>
+                                            <th 
+                                                className="p-4 pl-6 cursor-pointer hover:text-white transition-colors group select-none"
+                                                onClick={() => requestSort('symbol')}
+                                            >
+                                                Asset <SortIndicator currentSort={sortConfig} sortKey="symbol" />
+                                            </th>
+                                            <th 
+                                                className="p-4 text-right cursor-pointer hover:text-white transition-colors group select-none"
+                                                onClick={() => requestSort('marketValue')}
+                                            >
+                                                Market Value <SortIndicator currentSort={sortConfig} sortKey="marketValue" />
+                                            </th>
+                                            <th 
+                                                className="p-4 text-right cursor-pointer hover:text-white transition-colors group select-none"
+                                                onClick={() => requestSort('price')}
+                                            >
+                                                Price <SortIndicator currentSort={sortConfig} sortKey="price" />
+                                            </th>
+                                            <th 
+                                                className="p-4 text-right pr-6 cursor-pointer hover:text-white transition-colors group select-none"
+                                                onClick={() => requestSort('change')}
+                                            >
+                                                Day's Change <SortIndicator currentSort={sortConfig} sortKey="change" />
+                                            </th>
                                             <th className="p-4 text-center w-32">7-Day Trend</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {HOLDINGS.map(h => (
+                                        {sortedHoldings.map(h => (
                                             <tr key={h.id} onClick={() => handleOpenDetailModal(h)} className="border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer">
                                                 <td className="p-4 pl-6">
                                                     <div className="flex items-center gap-4">

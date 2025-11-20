@@ -31,10 +31,10 @@
         
         @keyframes zoom-in-out {
             0% { transform: translate(-50%, -50%) scale(1); }
-            50% { transform: translate(-50%, -50%) scale(1.1); }
+            50% { transform: translate(-50%, -50%) scale(1.15); }
             100% { transform: translate(-50%, -50%) scale(1); }
         }
-        .animate-zoom-in-out { animation: zoom-in-out 30s ease-in-out infinite; }
+        .animate-zoom-in-out { animation: zoom-in-out 60s ease-in-out infinite; }
         
         @keyframes kenburns-top { 0% { transform: scale(1) translateY(0); transform-origin: 50% 16%; } 100% { transform: scale(1.15) translateY(-15px); transform-origin: top; } }
         .animate-kenburns-top { animation: kenburns-top 20s ease-out infinite alternate; }
@@ -72,6 +72,15 @@
         @keyframes draw-checkmark-path {
             to { stroke-dashoffset: 0; }
         }
+        
+        @keyframes marquee {
+            0% { transform: translateX(0%); }
+            100% { transform: translateX(-50%); }
+        }
+        .animate-marquee {
+            animation: marquee 40s linear infinite;
+        }
+
         .logo-icon-gradient {
             background: linear-gradient(145deg, #e6b325, #c8961e);
             -webkit-background-clip: text;

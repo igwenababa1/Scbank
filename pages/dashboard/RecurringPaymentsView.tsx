@@ -1,8 +1,6 @@
 
 import React, { useState } from 'react';
-// FIX: Corrected import path
 import { RECURRING_PAYMENTS } from '../../constants';
-// FIX: Corrected import path
 import type { RecurringPayment } from '../../types';
 import RecurringPaymentItem from '../../components/dashboard/payments/RecurringPaymentItem';
 import SetupRecurringPaymentModal from '../../components/dashboard/payments/SetupRecurringPaymentModal';
@@ -38,40 +36,53 @@ const RecurringPaymentsView: React.FC = () => {
     };
 
     return (
-        <div className="p-8">
-            <div className="flex justify-between items-center mb-6">
+        <div className="p-8 max-w-7xl mx-auto">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                  <div>
-                    <h1 className="text-3xl font-bold text-[#1a365d]">Recurring Payments</h1>
-                    <p className="text-gray-600">Manage your scheduled and automated payments.</p>
+                    <h1 className="text-3xl font-bold text-[#1a365d] dark:text-white">Recurring Payments</h1>
+                    <p className="text-gray-600 dark:text-gray-400 mt-1">Manage your scheduled transfers and automated subscriptions.</p>
                 </div>
                 <button 
                     onClick={() => handleOpenModal()}
-                    className="px-5 py-2 rounded-md bg-[#e6b325] text-[#1a365d] font-semibold hover:bg-[#d19d1f] transition-colors"
+                    className="px-6 py-3 rounded-lg bg-[#e6b325] text-[#1a365d] font-bold shadow-lg hover:bg-[#d19d1f] hover:shadow-xl transition-all transform hover:-translate-y-0.5 flex items-center gap-2"
                 >
-                    + New Recurring Payment
+                    <i className="fas fa-plus"></i> New Payment
                 </button>
             </div>
             
-             <div className="bg-white p-6 rounded-xl shadow-md">
-                <div className="space-y-4">
-                    {payments.length > 0 ? (
-                        payments.map(payment => (
-                            <RecurringPaymentItem 
-                                key={payment.id} 
-                                payment={payment} 
-                                onEdit={() => handleOpenModal(payment)} 
-                                onDelete={() => handleDeletePayment(payment.id)} 
-                            />
-                        ))
-                    ) : (
-                        <div className="text-center py-12 text-gray-500">
-                            <i className="fas fa-calendar-times text-4xl mb-4"></i>
-                            <h3 className="text-lg font-semibold text-gray-700">No Recurring Payments Found</h3>
-                            <p className="text-gray-500">Set up a new recurring payment to get started.</p>
-                        </div>
-                    )}
+            <div className="bg-white dark:bg-slate-800 p-1 rounded-2xl shadow-lg border border-gray-100 dark:border-slate-700">
+                <div className="p-6">
+                    <div className="flex justify-between items-center mb-4 px-2">
+                        <h3 className="font-bold text-lg text-gray-800 dark:text-white">Active Schedules</h3>
+                        <span className="text-sm text-gray-500 dark:text-gray-400">{payments.length} active</span>
+                    </div>
+                    
+                    <div className="space-y-3">
+                        {payments.length > 0 ? (
+                            payments.map(payment => (
+                                <RecurringPaymentItem 
+                                    key={payment.id} 
+                                    payment={payment} 
+                                    onEdit={() => handleOpenModal(payment)} 
+                                    onDelete={() => handleDeletePayment(payment.id)}
+                                    variant="default" 
+                                />
+                            ))
+                        ) : (
+                            <div className="text-center py-16 text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-slate-900/50 rounded-xl border-2 border-dashed border-gray-200 dark:border-slate-700">
+                                <div className="w-16 h-16 bg-gray-100 dark:bg-slate-700 rounded-full flex items-center justify-center mx-auto mb-4">
+                                    <i className="fas fa-calendar-plus text-2xl text-gray-400"></i>
+                                </div>
+                                <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-1">No Recurring Payments</h3>
+                                <p className="text-sm">Set up your first automated payment to get started.</p>
+                                <button onClick={() => handleOpenModal()} className="mt-4 text-[#1a365d] dark:text-blue-400 font-semibold hover:underline">
+                                    Create Schedule
+                                </button>
+                            </div>
+                        )}
+                    </div>
                 </div>
-             </div>
+            </div>
 
             {isModalOpen && (
                 <SetupRecurringPaymentModal
